@@ -1,16 +1,14 @@
 --[[
     ═══════════════════════════════════════════════════════
-    AIMBOT ULTRA AGRESSIVO - MOBILE + PC
-    PUXA 100% CRAVADO - ATÉ ATRAVÉS DE PAREDES
+    AIMBOT SNAP INSTANTÂNEO - BRUTAL
+    COLA NA CABEÇA IMEDIATAMENTE - SEM LERDEZA
     ═══════════════════════════════════════════════════════
 ]]
 
 repeat wait() until game:IsLoaded()
 
-if _G.AimbotLoaded then
-    return warn("❌ Já está rodando!")
-end
-_G.AimbotLoaded = true
+if _G.BrutalAim then return end
+_G.BrutalAim = true
 
 -- ═══════════════════════════════════════════════════════
 -- SERVIÇOS
@@ -23,215 +21,125 @@ local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Detectar Mobile
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 -- ═══════════════════════════════════════════════════════
--- CONFIGURAÇÕES
+-- CONFIG
 -- ═══════════════════════════════════════════════════════
 
-local Config = {
-    -- ATIVAÇÃO
-    Enabled = false,
-    AutoLock = true, -- TRUE = Sempre ativo quando encontrar alvo
-    
-    -- ALVO
-    AimPart = "Head", -- "Head", "HumanoidRootPart", "UpperTorso"
-    
-    -- FORÇA (0-1)
-    LockPower = 1, -- 1 = TRAVA INSTANTÂNEA E TOTAL
-    
-    -- FOV
-    FOV = 500, -- Grande para pegar alvos longe
-    ShowFOV = true,
-    
-    -- VERIFICAÇÕES
+local Settings = {
+    Active = false,
+    AimPart = "Head", -- SEMPRE NA CABEÇA
     TeamCheck = true,
-    WallCheck = false, -- FALSE = PUXA ATÉ ATRAVÉS DE PAREDES
-    AliveCheck = true,
-    
-    -- PREDIÇÃO
+    FOV = 1000, -- FOV GIGANTE
     Prediction = true,
-    PredictAmount = 0.133,
-    
-    -- DISTÂNCIA
-    MaxDistance = 1000, -- Studs máximos
-    
-    -- MOBILE
-    MobileButton = true, -- Mostrar botão na tela (Mobile)
+    PredictValue = 0.165, -- Ajuste conforme ping
+    AutoShoot = false, -- Atirar automaticamente
 }
-
--- ═══════════════════════════════════════════════════════
--- VARIÁVEIS
--- ═══════════════════════════════════════════════════════
 
 local Target = nil
 local FOVCircle = nil
-local MobileButton = nil
-local Locked = false
 
 -- ═══════════════════════════════════════════════════════
--- CRIAR FOV CIRCLE (PC)
+-- FOV CIRCLE
 -- ═══════════════════════════════════════════════════════
 
 if Drawing and not IsMobile then
-    pcall(function()
-        FOVCircle = Drawing.new("Circle")
-        FOVCircle.Thickness = 2
-        FOVCircle.NumSides = 100
-        FOVCircle.Radius = Config.FOV
-        FOVCircle.Filled = false
-        FOVCircle.Visible = Config.ShowFOV
-        FOVCircle.Color = Color3.fromRGB(255, 0, 0)
-        FOVCircle.Transparency = 1
-    end)
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Thickness = 1
+    FOVCircle.NumSides = 100
+    FOVCircle.Radius = Settings.FOV
+    FOVCircle.Filled = false
+    FOVCircle.Visible = true
+    FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+    FOVCircle.Transparency = 0.5
 end
 
 -- ═══════════════════════════════════════════════════════
--- CRIAR BOTÃO MOBILE
+-- BOTÃO MOBILE
 -- ═══════════════════════════════════════════════════════
 
-if IsMobile and Config.MobileButton then
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "AimbotMobile"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local MobileBtn = nil
+
+if IsMobile then
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "BrutalAim"
+    sg.ResetOnSpawn = false
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    local Button = Instance.new("TextButton")
-    Button.Name = "AimbotButton"
-    Button.Parent = ScreenGui
-    Button.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    Button.BorderSizePixel = 0
-    Button.Position = UDim2.new(0.85, 0, 0.5, 0)
-    Button.Size = UDim2.new(0, 80, 0, 80)
-    Button.Font = Enum.Font.GothamBold
-    Button.Text = "OFF"
-    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Button.TextSize = 20
-    Button.TextWrapped = true
+    local btn = Instance.new("TextButton")
+    btn.Parent = sg
+    btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    btn.BorderSizePixel = 0
+    btn.Position = UDim2.new(0.88, 0, 0.45, 0)
+    btn.Size = UDim2.new(0, 70, 0, 70)
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = "AIM\nOFF"
+    btn.TextColor3 = Color3.white
+    btn.TextSize = 18
+    btn.TextWrapped = true
     
-    -- Arredondar cantos
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 12)
-    Corner.Parent = Button
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = btn
     
-    -- Stroke
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(255, 255, 255)
-    Stroke.Thickness = 3
-    Stroke.Parent = Button
-    
-    -- Função do botão
-    Button.MouseButton1Click:Connect(function()
-        Config.Enabled = not Config.Enabled
-        Locked = Config.Enabled
-        
-        if Config.Enabled then
-            Button.Text = "ON"
-            Button.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-            Stroke.Color = Color3.fromRGB(0, 255, 0)
-        else
-            Button.Text = "OFF"
-            Button.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-            Stroke.Color = Color3.fromRGB(255, 255, 255)
-        end
+    btn.MouseButton1Click:Connect(function()
+        Settings.Active = not Settings.Active
+        btn.Text = Settings.Active and "AIM\nON" or "AIM\nOFF"
+        btn.BackgroundColor3 = Settings.Active and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
     end)
     
-    -- Arrastar botão
-    local dragging = false
-    local dragInput, mousePos, framePos
-    
-    Button.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            mousePos = input.Position
-            framePos = Button.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    
-    Button.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - mousePos
-            Button.Position = UDim2.new(
-                framePos.X.Scale,
-                framePos.X.Offset + delta.X,
-                framePos.Y.Scale,
-                framePos.Y.Offset + delta.Y
-            )
-        end
-    end)
-    
-    -- Parent para CoreGui (não é deletado ao morrer)
     pcall(function()
-        ScreenGui.Parent = game:GetService("CoreGui")
+        sg.Parent = game:GetService("CoreGui")
     end)
     
-    if not ScreenGui.Parent then
-        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    if not sg.Parent then
+        sg.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
     
-    MobileButton = Button
+    MobileBtn = btn
 end
 
 -- ═══════════════════════════════════════════════════════
--- FUNÇÕES
+-- FUNÇÕES CORE
 -- ═══════════════════════════════════════════════════════
 
--- Validar alvo
-local function IsValid(player)
-    if not player or player == LocalPlayer then return false end
+local function IsValid(plr)
+    if not plr or plr == LocalPlayer then return false end
     
-    local char = player.Character
-    if not char then return false end
-    
-    if Config.AliveCheck then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return false end
-    end
-    
-    if Config.TeamCheck and player.Team == LocalPlayer.Team then
+    if Settings.TeamCheck and plr.Team == LocalPlayer.Team then
         return false
     end
+    
+    local char = plr.Character
+    if not char then return false end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
     
     return true
 end
 
--- Pegar alvo mais próximo
-local function GetTarget()
+local function GetClosest()
     local closest = nil
-    local shortestDist = Config.MaxDistance
+    local minDist = Settings.FOV
     
-    for _, player in pairs(Players:GetPlayers()) do
-        if IsValid(player) then
-            local char = player.Character
-            local part = char:FindFirstChild(Config.AimPart)
+    local mousePos = IsMobile and Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2) or UserInputService:GetMouseLocation()
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if IsValid(plr) then
+            local char = plr.Character
+            local head = char:FindFirstChild(Settings.AimPart)
             
-            if not part then
-                part = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-            end
-            
-            if part then
-                local distance = (part.Position - Camera.CFrame.Position).Magnitude
+            if head then
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 
-                if distance < shortestDist then
-                    -- Verificar se está na tela
-                    local _, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
                     
-                    if onScreen then
-                        shortestDist = distance
-                        closest = player
+                    if dist < minDist then
+                        minDist = dist
+                        closest = plr
                     end
                 end
             end
@@ -241,60 +149,58 @@ local function GetTarget()
     return closest
 end
 
--- LOCK TOTAL NO ALVO
-local function LockTarget()
-    if not Locked then return end
-    if not Target or not Target.Character then 
-        Target = nil
-        return 
-    end
+-- ═══════════════════════════════════════════════════════
+-- SNAP INSTANTÂNEO
+-- ═══════════════════════════════════════════════════════
+
+local function SnapToHead()
+    if not Settings.Active then return end
+    if not Target or not Target.Character then return end
     
-    local part = Target.Character:FindFirstChild(Config.AimPart)
-    if not part then
-        part = Target.Character:FindFirstChild("Head")
-    end
-    if not part then return end
+    local head = Target.Character:FindFirstChild(Settings.AimPart)
+    if not head then return end
     
     -- Posição do alvo
-    local targetPos = part.Position
+    local targetPos = head.Position
     
     -- PREDIÇÃO
-    if Config.Prediction then
-        local velocity = part.AssemblyLinearVelocity or Vector3.new(0,0,0)
-        targetPos = targetPos + (velocity * Config.PredictAmount)
+    if Settings.Prediction then
+        local vel = head.AssemblyLinearVelocity or Vector3.zero
+        targetPos = targetPos + (vel * Settings.PredictValue)
     end
     
-    -- TRAVAR CAMERA TOTALMENTE
+    -- SNAP INSTANTÂNEO - SEM LERP, SEM SUAVIZAÇÃO
     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
-end
-
--- Atualizar FOV
-local function UpdateFOV()
-    if FOVCircle then
-        pcall(function()
-            local mouse = UserInputService:GetMouseLocation()
-            FOVCircle.Position = mouse
-            FOVCircle.Visible = Config.ShowFOV and Config.Enabled
-            FOVCircle.Radius = Config.FOV
-        end)
+    
+    -- Auto shoot
+    if Settings.AutoShoot and mouse1press then
+        mouse1press()
+        wait(0.01)
+        mouse1release()
     end
 end
 
 -- ═══════════════════════════════════════════════════════
--- LOOP PRINCIPAL
+-- LOOP
 -- ═══════════════════════════════════════════════════════
 
-RunService.RenderStepped:Connect(function()
-    UpdateFOV()
+RunService.Heartbeat:Connect(function()
+    if FOVCircle then
+        local mp = UserInputService:GetMouseLocation()
+        FOVCircle.Position = mp
+        FOVCircle.Visible = Settings.Active
+    end
     
-    if Config.Enabled or (Config.AutoLock and Locked) then
-        -- Atualizar alvo a cada frame
-        Target = GetTarget()
-        
-        -- Travar no alvo
-        if Target then
-            LockTarget()
-        end
+    if Settings.Active then
+        Target = GetClosest()
+        SnapToHead()
+    end
+end)
+
+-- Loop adicional no RenderStepped para ser ainda mais rápido
+RunService.RenderStepped:Connect(function()
+    if Settings.Active then
+        SnapToHead()
     end
 end)
 
@@ -303,136 +209,105 @@ end)
 -- ═══════════════════════════════════════════════════════
 
 if not IsMobile then
-    -- Botão direito para ativar
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
         
         -- Botão direito
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            Locked = true
-            Config.Enabled = true
+            Settings.Active = true
         end
         
-        -- E para toggle
-        if input.KeyCode == Enum.KeyCode.E then
-            Config.Enabled = not Config.Enabled
-            Locked = Config.Enabled
-            print("🎯 AIMBOT:", Config.Enabled and "✅ ON" or "❌ OFF")
+        -- Q = Toggle
+        if input.KeyCode == Enum.KeyCode.Q then
+            Settings.Active = not Settings.Active
+            print("🎯", Settings.Active and "ON" or "OFF")
         end
         
-        -- T para trocar parte
-        if input.KeyCode == Enum.KeyCode.T then
-            local parts = {"Head", "HumanoidRootPart", "UpperTorso"}
-            local current = table.find(parts, Config.AimPart) or 1
-            Config.AimPart = parts[(current % #parts) + 1]
-            print("🎯 Mirando:", Config.AimPart)
-        end
-        
-        -- F para FOV
-        if input.KeyCode == Enum.KeyCode.F then
-            Config.ShowFOV = not Config.ShowFOV
+        -- C = AutoShoot
+        if input.KeyCode == Enum.KeyCode.C then
+            Settings.AutoShoot = not Settings.AutoShoot
+            print("🔫 AutoShoot:", Settings.AutoShoot and "ON" or "OFF")
         end
     end)
     
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            Locked = false
-            Config.Enabled = false
+            Settings.Active = false
         end
     end)
 end
 
 -- ═══════════════════════════════════════════════════════
--- COMANDOS NO CHAT
+-- COMANDOS CHAT
 -- ═══════════════════════════════════════════════════════
 
 LocalPlayer.Chatted:Connect(function(msg)
     msg = msg:lower()
     
-    if msg == "/aim" or msg == "/aimbot" then
-        Config.Enabled = not Config.Enabled
-        Locked = Config.Enabled
-        
-        if MobileButton then
-            MobileButton.Text = Config.Enabled and "ON" or "OFF"
-            MobileButton.BackgroundColor3 = Config.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+    if msg == "/aim" then
+        Settings.Active = not Settings.Active
+        if MobileBtn then
+            MobileBtn.Text = Settings.Active and "AIM\nON" or "AIM\nOFF"
+            MobileBtn.BackgroundColor3 = Settings.Active and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
         end
+        print("🎯", Settings.Active and "ON" or "OFF")
         
-        print("🎯 AIMBOT:", Config.Enabled and "✅ ON" or "❌ OFF")
+    elseif msg == "/autoshoot" then
+        Settings.AutoShoot = not Settings.AutoShoot
+        print("🔫 AutoShoot:", Settings.AutoShoot and "ON" or "OFF")
         
-    elseif msg == "/head" then
-        Config.AimPart = "Head"
-        print("🎯 Alvo: CABEÇA")
-        
-    elseif msg == "/body" then
-        Config.AimPart = "HumanoidRootPart"
-        print("🎯 Alvo: CORPO")
-        
-    elseif msg == "/chest" or msg == "/torso" then
-        Config.AimPart = "UpperTorso"
-        print("🎯 Alvo: PEITO")
-        
-    elseif msg:sub(1, 4) == "/fov" then
-        local fov = tonumber(msg:sub(6))
-        if fov then
-            Config.FOV = fov
-            print("🎯 FOV:", fov)
+    elseif msg:match("^/predict%s") then
+        local val = tonumber(msg:match("%d+%.?%d*"))
+        if val then
+            Settings.PredictValue = val
+            print("📍 Predição:", val)
         end
     end
 end)
 
 -- ═══════════════════════════════════════════════════════
--- INICIALIZAÇÃO
+-- INIT
 -- ═══════════════════════════════════════════════════════
 
 print("╔════════════════════════════════════════╗")
-print("║  🎯 AIMBOT ULTRA AGRESSIVO - ATIVO 🎯 ║")
+print("║   🎯 AIMBOT SNAP INSTANTÂNEO 🎯       ║")
 print("╠════════════════════════════════════════╣")
-print("║                                        ║")
 
 if IsMobile then
-    print("║  📱 MODO MOBILE ATIVADO                ║")
-    print("║                                        ║")
-    print("║  🔴 Use o BOTÃO na tela                ║")
-    print("║  📍 Arraste para mover o botão         ║")
+    print("║  📱 MOBILE: Use o botão na tela       ║")
+    print("║  🔴 Vermelho = OFF                     ║")
+    print("║  🟢 Verde = ON                         ║")
 else
-    print("║  🖥️ MODO PC ATIVADO                    ║")
-    print("║                                        ║")
-    print("║  • BOTÃO DIREITO - Ativar              ║")
-    print("║  • E - Toggle ON/OFF                   ║")
-    print("║  • T - Trocar parte                    ║")
-    print("║  • F - Toggle FOV                      ║")
+    print("║  🖥️ PC CONTROLES:                      ║")
+    print("║  • SEGURAR BOTÃO DIREITO = Ativar     ║")
+    print("║  • Q = Toggle ON/OFF                  ║")
+    print("║  • C = AutoShoot ON/OFF               ║")
 end
 
 print("║                                        ║")
-print("║  💬 COMANDOS NO CHAT:                  ║")
+print("║  💬 COMANDOS CHAT:                     ║")
 print("║  /aim - Toggle                         ║")
-print("║  /head - Mirar cabeça                  ║")
-print("║  /body - Mirar corpo                   ║")
-print("║  /fov 300 - Mudar FOV                  ║")
+print("║  /autoshoot - Auto atirar              ║")
+print("║  /predict 0.15 - Ajustar predição      ║")
 print("║                                        ║")
-print("║  ⚠️ WALLCHECK: DESATIVADO              ║")
-print("║  🔥 PUXA ATÉ ATRAVÉS DE PAREDES        ║")
-print("║  ⚡ TRAVA 100% INSTANTÂNEA              ║")
+print("║  ⚡ SNAP INSTANTÂNEO                    ║")
+print("║  🎯 COLA NA CABEÇA SEM DELAY           ║")
+print("║  🔥 SEM SUAVIZAÇÃO                     ║")
 print("║                                        ║")
 print("╚════════════════════════════════════════╝")
 
--- Notificação
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "🎯 AIMBOT ULTRA";
-    Text = IsMobile and "📱 Use o botão na tela!" or "✅ Segure BOTÃO DIREITO";
-    Duration = 5;
+game.StarterGui:SetCore("SendNotification", {
+    Title = "⚡ SNAP AIMBOT";
+    Text = IsMobile and "📱 Use o botão!" or "🖱️ Segure botão direito!";
+    Duration = 4;
 })
 
 if IsMobile then
-    print("\n📱 MOBILE: Aperte o botão VERMELHO na tela para ativar!")
-    print("📍 Arraste o botão para mudar de posição!")
+    print("\n📱 APERTE O BOTÃO VERMELHO para ativar!")
 else
-    print("\n✅ PC: Segure o BOTÃO DIREITO DO MOUSE para travar!")
-    print("💡 Digite /aim no chat para ativar permanente!")
+    print("\n🖱️ SEGURE O BOTÃO DIREITO DO MOUSE!")
 end
 
-print("\n🔥 AIMBOT CRAVADO 100% - SEM WALLCHECK - PUXA ATRAVÉS DE TUDO!\n")
+print("🔥 AIMBOT SNAP - COLA INSTANTÂNEO NA CABEÇA!\n")
 
--- Retornar configurações
-return Config
+return Settings
