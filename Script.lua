@@ -1,17 +1,29 @@
 --[[
     ════════════════════════════════════════════════════════════
-    🎯 AIMBOT DEFINITIVO - O MELHOR POSSÍVEL 🎯
+    🎯 AIMBOT DEFINITIVO - DELTA EXECUTOR FIXED 🎯
     
     ✅ SNAP INSTANTÂNEO
     ✅ INTERFACE MOBILE COMPLETA
     ✅ ANTI-BAN INTEGRADO
     ✅ PREDIÇÃO AVANÇADA
     ✅ FOV VISUAL
-    ✅ 100% FUNCIONAL
+    ✅ 100% COMPATÍVEL COM DELTA
     ════════════════════════════════════════════════════════════
 ]]
 
-wait(0.5)
+-- Aguardar carregamento
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+task.wait(0.3)
+
+-- Verificar duplicação
+if _G.AimbotDefinitivo then
+    warn("⚠️ Aimbot já está rodando!")
+    return
+end
+_G.AimbotDefinitivo = true
 
 -- ════════════════════════════════════════════════════════════
 -- SERVICES
@@ -20,220 +32,293 @@ wait(0.5)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
+-- Detectar plataforma
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+print("════════════════════════════════════════")
+print("🎯 AIMBOT DEFINITIVO - Iniciando...")
+print("📱 Plataforma:", IsMobile and "MOBILE" or "PC")
+print("════════════════════════════════════════")
 
 -- ════════════════════════════════════════════════════════════
 -- CONFIGURAÇÃO
 -- ════════════════════════════════════════════════════════════
 
-getgenv().AimbotSettings = {
+_G.AimbotConfig = {
     Enabled = false,
-    TeamCheck = true,
+    TeamCheck = false, -- DESATIVADO
     AliveCheck = true,
-    WallCheck = false, -- false = PUXA ATRAVÉS DE PAREDES
+    WallCheck = false,
     
-    -- FOV
     FOVRadius = 300,
     FOVVisible = true,
     
-    -- LOCK
-    LockMode = "Snap", -- "Snap" = instantâneo | "Smooth" = suave
-    Smoothness = 0.1, -- Só funciona se LockMode = "Smooth"
+    LockMode = "Snap",
+    Smoothness = 0.1,
     
-    -- PREDIÇÃO
     Prediction = true,
-    PredictionAmount = 0.133,
+    PredictionAmount = 0.165, -- AUMENTADO para compensar delay
     
-    -- ALVO
     TargetPart = "Head",
+    
+    -- NOVO: Modo de prioridade
+    TargetMode = "Distance", -- "Distance" = mais perto de você | "Cursor" = mais perto do cursor
 }
 
-local Settings = getgenv().AimbotSettings
+local Config = _G.AimbotConfig
 local CurrentTarget = nil
 local FOVCircle = nil
-local Locked = false
+local IsLocked = false
+local Connections = {}
 
 -- ════════════════════════════════════════════════════════════
 -- FOV CIRCLE (PC)
 -- ════════════════════════════════════════════════════════════
 
-if Drawing and not IsMobile then
-    FOVCircle = Drawing.new("Circle")
-    FOVCircle.Thickness = 2
-    FOVCircle.NumSides = 100
-    FOVCircle.Radius = Settings.FOVRadius
-    FOVCircle.Filled = false
-    FOVCircle.Visible = Settings.FOVVisible
-    FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-    FOVCircle.Transparency = 1
-    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+if not IsMobile then
+    local success, err = pcall(function()
+        if Drawing then
+            FOVCircle = Drawing.new("Circle")
+            FOVCircle.Thickness = 2
+            FOVCircle.NumSides = 64
+            FOVCircle.Radius = Config.FOVRadius
+            FOVCircle.Filled = false
+            FOVCircle.Visible = Config.FOVVisible
+            FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+            FOVCircle.Transparency = 1
+            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            print("✅ FOV Circle criado")
+        else
+            print("⚠️ Drawing API não disponível")
+        end
+    end)
+    
+    if not success then
+        warn("❌ Erro ao criar FOV:", err)
+    end
 end
 
 -- ════════════════════════════════════════════════════════════
--- INTERFACE MOBILE
+-- INTERFACE MOBILE/PC
 -- ════════════════════════════════════════════════════════════
 
 local GUI = Instance.new("ScreenGui")
-GUI.Name = "AimbotDEFINITIVO"
+GUI.Name = "AimbotDefinitivo_" .. tostring(math.random(1000, 9999))
 GUI.ResetOnSpawn = false
 GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+GUI.DisplayOrder = 999999
+
+print("📋 Criando interface...")
 
 -- Frame Principal
-local Main = Instance.new("Frame")
-Main.Name = "MainFrame"
-Main.Parent = GUI
-Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-Main.BorderSizePixel = 0
-Main.Position = UDim2.new(0.5, -175, 0.04, 0)
-Main.Size = UDim2.new(0, 350, 0, 140)
-Main.Active = true
-Main.Draggable = true
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = GUI
+MainFrame.AnchorPoint = Vector2.new(0.5, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, 0, 0.02, 0)
+MainFrame.Size = UDim2.new(0, 380, 0, 150)
+MainFrame.Active = true
+MainFrame.Draggable = true
 
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 15)
-MainCorner.Parent = Main
+MainCorner.CornerRadius = UDim.new(0, 16)
+MainCorner.Parent = MainFrame
 
 local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(0, 255, 255)
-MainStroke.Thickness = 2
-MainStroke.Parent = Main
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainStroke.Color = Color3.fromRGB(0, 200, 255)
+MainStroke.Thickness = 3
+MainStroke.Parent = MainFrame
 
 -- Título
-local Title = Instance.new("TextLabel")
-Title.Parent = Main
-Title.BackgroundTransparency = 1
-Title.Position = UDim2.new(0, 0, 0, 5)
-Title.Size = UDim2.new(1, 0, 0, 25)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "🎯 AIMBOT DEFINITIVO"
-Title.TextColor3 = Color3.fromRGB(0, 255, 255)
-Title.TextSize = 18
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "Title"
+TitleLabel.Parent = MainFrame
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 0, 0, 8)
+TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "🎯 AIMBOT DEFINITIVO"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+TitleLabel.TextSize = 20
+TitleLabel.TextStrokeTransparency = 0.8
 
--- Botão Principal (GRANDE)
-local MainBtn = Instance.new("TextButton")
-MainBtn.Name = "MainButton"
-MainBtn.Parent = Main
-MainBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-MainBtn.BorderSizePixel = 0
-MainBtn.Position = UDim2.new(0.05, 0, 0.25, 0)
-MainBtn.Size = UDim2.new(0.55, 0, 0.45, 0)
-MainBtn.Font = Enum.Font.GothamBold
-MainBtn.Text = "❌ OFF"
-MainBtn.TextColor3 = Color3.white
-MainBtn.TextSize = 28
+-- Botão Principal ON/OFF
+local MainButton = Instance.new("TextButton")
+MainButton.Name = "ToggleButton"
+MainButton.Parent = MainFrame
+MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
+MainButton.BorderSizePixel = 0
+MainButton.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainButton.Size = UDim2.new(0.55, 0, 0.4, 0)
+MainButton.Font = Enum.Font.GothamBold
+MainButton.Text = "❌ OFF"
+MainButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MainButton.TextSize = 32
+MainButton.TextStrokeTransparency = 0.5
+MainButton.AutoButtonColor = false
 
 local MainBtnCorner = Instance.new("UICorner")
 MainBtnCorner.CornerRadius = UDim.new(0, 12)
-MainBtnCorner.Parent = MainBtn
+MainBtnCorner.Parent = MainButton
 
--- Botão Team Check
-local TeamBtn = Instance.new("TextButton")
-TeamBtn.Name = "TeamButton"
-TeamBtn.Parent = Main
-TeamBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-TeamBtn.BorderSizePixel = 0
-TeamBtn.Position = UDim2.new(0.63, 0, 0.25, 0)
-TeamBtn.Size = UDim2.new(0.32, 0, 0.45, 0)
-TeamBtn.Font = Enum.Font.GothamBold
-TeamBtn.Text = "TEAM\nCHECK"
-TeamBtn.TextColor3 = Color3.white
-TeamBtn.TextSize = 14
+local MainBtnStroke = Instance.new("UIStroke")
+MainBtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainBtnStroke.Color = Color3.fromRGB(255, 255, 255)
+MainBtnStroke.Thickness = 2
+MainBtnStroke.Parent = MainButton
 
-local TeamBtnCorner = Instance.new("UICorner")
-TeamBtnCorner.CornerRadius = UDim.new(0, 10)
-TeamBtnCorner.Parent = TeamBtn
+-- Botão Team Check REMOVIDO - substituir por outro botão útil
+local ModeButton = Instance.new("TextButton")
+ModeButton.Name = "ModeButton"
+ModeButton.Parent = MainFrame
+ModeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 220)
+ModeButton.BorderSizePixel = 0
+ModeButton.Position = UDim2.new(0.63, 0, 0.3, 0)
+ModeButton.Size = UDim2.new(0.32, 0, 0.4, 0)
+ModeButton.Font = Enum.Font.GothamBold
+ModeButton.Text = "📏\nDIST"
+ModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ModeButton.TextSize = 16
+ModeButton.TextStrokeTransparency = 0.5
+ModeButton.AutoButtonColor = false
 
--- Label de Status
-local Status = Instance.new("TextLabel")
-Status.Name = "StatusLabel"
-Status.Parent = Main
-Status.BackgroundTransparency = 1
-Status.Position = UDim2.new(0, 0, 0.75, 0)
-Status.Size = UDim2.new(1, 0, 0.2, 0)
-Status.Font = Enum.Font.Gotham
-Status.Text = "🔍 Procurando alvo..."
-Status.TextColor3 = Color3.fromRGB(200, 200, 200)
-Status.TextSize = 13
+local ModeBtnCorner = Instance.new("UICorner")
+ModeBtnCorner.CornerRadius = UDim.new(0, 12)
+ModeBtnCorner.Parent = ModeButton
 
--- Label de Info
-local Info = Instance.new("TextLabel")
-Info.Parent = Main
-Info.BackgroundTransparency = 1
-Info.Position = UDim2.new(0, 0, 0.88, 0)
-Info.Size = UDim2.new(1, 0, 0.12, 0)
-Info.Font = Enum.Font.Gotham
-Info.Text = IsMobile and "📱 Mobile Mode" or "🖥️ PC: Hold Right Click"
-Info.TextColor3 = Color3.fromRGB(150, 150, 150)
-Info.TextSize = 11
+local ModeBtnStroke = Instance.new("UIStroke")
+ModeBtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ModeBtnStroke.Color = Color3.fromRGB(255, 255, 255)
+ModeBtnStroke.Thickness = 2
+ModeBtnStroke.Parent = ModeButton
 
--- Parent
-pcall(function()
-    GUI.Parent = game:GetService("CoreGui")
+-- Status Label
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Name = "Status"
+StatusLabel.Parent = MainFrame
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Position = UDim2.new(0, 0, 0.73, 0)
+StatusLabel.Size = UDim2.new(1, 0, 0.15, 0)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Text = "🔍 Aguardando ativação..."
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.TextSize = 14
+
+-- Info Label
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Name = "Info"
+InfoLabel.Parent = MainFrame
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Position = UDim2.new(0, 0, 0.88, 0)
+InfoLabel.Size = UDim2.new(1, 0, 0.12, 0)
+InfoLabel.Font = Enum.Font.GothamMedium
+InfoLabel.Text = IsMobile and "📱 Mobile Mode | Arraste para mover" or "🖥️ PC: Hold Right Click | E = Toggle"
+InfoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+InfoLabel.TextSize = 11
+
+-- Parent para CoreGui primeiro, senão PlayerGui
+local success = pcall(function()
+    GUI.Parent = CoreGui
 end)
 
-if not GUI.Parent then
-    GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
+if not success or not GUI.Parent then
+    print("⚠️ CoreGui falhou, usando PlayerGui")
+    local PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if PlayerGui then
+        GUI.Parent = PlayerGui
+    else
+        LocalPlayer:WaitForChild("PlayerGui", 5)
+        GUI.Parent = LocalPlayer.PlayerGui
+    end
 end
+
+print("✅ Interface criada em:", GUI.Parent.Name)
 
 -- ════════════════════════════════════════════════════════════
 -- FUNÇÕES AIMBOT
 -- ════════════════════════════════════════════════════════════
 
-local function IsValidTarget(player)
+local function IsValidPlayer(player)
     if not player or player == LocalPlayer then return false end
     
-    if Settings.TeamCheck and player.Team == LocalPlayer.Team then
+    if Config.TeamCheck and player.Team == LocalPlayer.Team then
         return false
     end
     
     local character = player.Character
     if not character then return false end
     
-    if Settings.AliveCheck then
+    if Config.AliveCheck then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then return false end
+        if not humanoid or humanoid.Health <= 0 then
+            return false
+        end
     end
     
     return true
 end
 
-local function GetClosestPlayer()
+local function GetClosestTarget()
     local closestPlayer = nil
-    local shortestDistance = Settings.FOVRadius
+    local shortestDistance = math.huge -- Mudado para sempre buscar o mais próximo
     
-    local mousePos = IsMobile and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) 
-                                or UserInputService:GetMouseLocation()
+    local myPosition = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myPosition then return nil end
+    myPosition = myPosition.Position
     
     for _, player in pairs(Players:GetPlayers()) do
-        if IsValidTarget(player) then
+        if IsValidPlayer(player) then
             local character = player.Character
-            local targetPart = character:FindFirstChild(Settings.TargetPart)
+            local targetPart = character:FindFirstChild(Config.TargetPart)
             
             if not targetPart then
-                targetPart = character:FindFirstChild("Head")
+                targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
             end
             
             if targetPart then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                local screenPosition, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 
                 if onScreen then
-                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    local distance
+                    
+                    if Config.TargetMode == "Distance" then
+                        -- DISTÂNCIA DO JOGADOR (3D)
+                        distance = (targetPart.Position - myPosition).Magnitude
+                    else
+                        -- DISTÂNCIA DO CURSOR (2D)
+                        local mousePos
+                        if IsMobile then
+                            mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        else
+                            mousePos = UserInputService:GetMouseLocation()
+                        end
+                        distance = (Vector2.new(screenPosition.X, screenPosition.Y) - mousePos).Magnitude
+                    end
                     
                     if distance < shortestDistance then
-                        if not Settings.WallCheck then
+                        if not Config.WallCheck then
                             closestPlayer = player
                             shortestDistance = distance
                         else
-                            -- Wall Check
+                            -- Wall check
                             local origin = Camera.CFrame.Position
                             local direction = (targetPart.Position - origin)
-                            local ray = Ray.new(origin, direction)
-                            local hit = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, targetPart.Parent})
                             
-                            if not hit then
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterDescendantsInstances = {LocalPlayer.Character, character}
+                            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                            
+                            local rayResult = workspace:Raycast(origin, direction, rayParams)
+                            
+                            if not rayResult then
                                 closestPlayer = player
                                 shortestDistance = distance
                             end
@@ -247,209 +332,251 @@ local function GetClosestPlayer()
     return closestPlayer
 end
 
-local function LockOnTarget()
-    if not Locked or not Settings.Enabled then return end
+local function AimAtTarget()
+    if not IsLocked or not Config.Enabled then return end
     if not CurrentTarget or not CurrentTarget.Character then return end
     
-    local targetPart = CurrentTarget.Character:FindFirstChild(Settings.TargetPart)
+    local targetPart = CurrentTarget.Character:FindFirstChild(Config.TargetPart)
+    if not targetPart then
+        targetPart = CurrentTarget.Character:FindFirstChild("Head")
+    end
     if not targetPart then return end
     
-    -- Calcular posição
+    -- Posição do alvo
     local targetPosition = targetPart.Position
     
-    -- PREDIÇÃO
-    if Settings.Prediction then
-        local velocity = targetPart.AssemblyLinearVelocity or Vector3.zero
-        targetPosition = targetPosition + (velocity * Settings.PredictionAmount)
+    -- PREDIÇÃO AVANÇADA
+    if Config.Prediction then
+        local velocity = targetPart.AssemblyLinearVelocity or targetPart.Velocity or Vector3.zero
+        
+        -- Calcular distância para ajustar predição dinamicamente
+        local distance = (targetPosition - Camera.CFrame.Position).Magnitude
+        local distanceMultiplier = math.clamp(distance / 100, 0.5, 2) -- Ajusta predição baseado na distância
+        
+        -- Aplicar predição com multiplicador
+        targetPosition = targetPosition + (velocity * Config.PredictionAmount * distanceMultiplier)
     end
     
     local cameraPosition = Camera.CFrame.Position
-    local targetCFrame = CFrame.new(cameraPosition, targetPosition)
+    local aimCFrame = CFrame.new(cameraPosition, targetPosition)
     
-    -- APLICAR LOCK
-    if Settings.LockMode == "Snap" then
-        Camera.CFrame = targetCFrame
-    else
-        Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 - Settings.Smoothness)
-    end
+    -- Aplicar lock INSTANTÂNEO
+    Camera.CFrame = aimCFrame
 end
 
 local function UpdateFOV()
     if FOVCircle then
-        local mousePos = UserInputService:GetMouseLocation()
-        FOVCircle.Position = mousePos
-        FOVCircle.Radius = Settings.FOVRadius
-        FOVCircle.Visible = Settings.FOVVisible and Settings.Enabled
+        pcall(function()
+            local mousePos = UserInputService:GetMouseLocation()
+            FOVCircle.Position = mousePos
+            FOVCircle.Radius = Config.FOVRadius
+            FOVCircle.Visible = Config.FOVVisible and Config.Enabled
+        end)
     end
 end
 
 local function UpdateStatus()
-    if CurrentTarget then
-        Status.Text = "🎯 TRAVADO: " .. CurrentTarget.Name
-        Status.TextColor3 = Color3.fromRGB(0, 255, 0)
-    else
-        Status.Text = "🔍 Procurando alvo..."
-        Status.TextColor3 = Color3.fromRGB(200, 200, 200)
-    end
+    pcall(function()
+        if CurrentTarget then
+            StatusLabel.Text = "🎯 TRAVADO: " .. CurrentTarget.Name
+            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        else
+            if Config.Enabled then
+                StatusLabel.Text = "🔍 Procurando alvo..."
+                StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+            else
+                StatusLabel.Text = "⭕ Desativado"
+                StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+        end
+    end)
 end
 
 -- ════════════════════════════════════════════════════════════
--- LOOP PRINCIPAL
+-- LOOPS PRINCIPAIS
 -- ════════════════════════════════════════════════════════════
 
-RunService.Heartbeat:Connect(function()
+Connections.Heartbeat = RunService.Heartbeat:Connect(function()
     UpdateFOV()
     UpdateStatus()
     
-    if Settings.Enabled and Locked then
-        CurrentTarget = GetClosestPlayer()
-        LockOnTarget()
+    if Config.Enabled and IsLocked then
+        CurrentTarget = GetClosestTarget()
     end
 end)
 
--- Loop extra para ser mais rápido
-RunService.RenderStepped:Connect(function()
-    if Settings.Enabled and Locked then
-        LockOnTarget()
+Connections.RenderStepped = RunService.RenderStepped:Connect(function()
+    if Config.Enabled and IsLocked and CurrentTarget then
+        AimAtTarget()
     end
 end)
+
+print("✅ Loops iniciados")
 
 -- ════════════════════════════════════════════════════════════
--- CONTROLES GUI
+-- EVENTOS GUI
 -- ════════════════════════════════════════════════════════════
 
-MainBtn.MouseButton1Click:Connect(function()
-    Settings.Enabled = not Settings.Enabled
-    Locked = Settings.Enabled
+MainButton.MouseButton1Click:Connect(function()
+    Config.Enabled = not Config.Enabled
+    IsLocked = Config.Enabled
     
-    if Settings.Enabled then
-        MainBtn.Text = "✅ ON"
-        MainBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-        MainStroke.Color = Color3.fromRGB(0, 255, 0)
+    if Config.Enabled then
+        MainButton.Text = "✅ ON"
+        MainButton.BackgroundColor3 = Color3.fromRGB(20, 220, 20)
+        MainStroke.Color = Color3.fromRGB(0, 255, 100)
     else
-        MainBtn.Text = "❌ OFF"
-        MainBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        MainStroke.Color = Color3.fromRGB(0, 255, 255)
+        MainButton.Text = "❌ OFF"
+        MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
+        MainStroke.Color = Color3.fromRGB(0, 200, 255)
+    end
+    
+    print("🎯 Aimbot:", Config.Enabled and "ON" or "OFF")
+end)
+
+ModeButton.MouseButton1Click:Connect(function()
+    if Config.TargetMode == "Distance" then
+        Config.TargetMode = "Cursor"
+        ModeButton.Text = "🖱️\nCURSOR"
+        ModeButton.BackgroundColor3 = Color3.fromRGB(220, 100, 220)
+        print("🖱️ Modo: CURSOR (mais próximo do cursor)")
+    else
+        Config.TargetMode = "Distance"
+        ModeButton.Text = "📏\nDIST"
+        ModeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 220)
+        print("📏 Modo: DISTANCE (mais próximo de você)")
     end
 end)
 
-TeamBtn.MouseButton1Click:Connect(function()
-    Settings.TeamCheck = not Settings.TeamCheck
-    
-    if Settings.TeamCheck then
-        TeamBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        TeamBtn.Text = "TEAM\nCHECK"
-    else
-        TeamBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        TeamBtn.Text = "NO\nTEAM"
-    end
-end)
+print("✅ Eventos GUI conectados")
 
 -- ════════════════════════════════════════════════════════════
 -- CONTROLES PC
 -- ════════════════════════════════════════════════════════════
 
 if not IsMobile then
-    UserInputService.InputBegan:Connect(function(input, gpe)
-        if gpe then return end
+    Connections.InputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
         
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            Locked = true
-            Settings.Enabled = true
+            IsLocked = true
+            Config.Enabled = true
         end
         
         if input.KeyCode == Enum.KeyCode.E then
-            Settings.Enabled = not Settings.Enabled
-            Locked = Settings.Enabled
+            Config.Enabled = not Config.Enabled
+            IsLocked = Config.Enabled
+            
+            -- Atualizar botão
+            if Config.Enabled then
+                MainButton.Text = "✅ ON"
+                MainButton.BackgroundColor3 = Color3.fromRGB(20, 220, 20)
+            else
+                MainButton.Text = "❌ OFF"
+                MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
+            end
+        end
+        
+        if input.KeyCode == Enum.KeyCode.T then
+            local parts = {"Head", "UpperTorso", "HumanoidRootPart"}
+            local currentIndex = table.find(parts, Config.TargetPart) or 1
+            Config.TargetPart = parts[(currentIndex % #parts) + 1]
+            print("🎯 Alvo:", Config.TargetPart)
         end
     end)
     
-    UserInputService.InputEnded:Connect(function(input)
+    Connections.InputEnded = UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            Locked = false
-            Settings.Enabled = false
+            IsLocked = false
+            Config.Enabled = false
+            
+            MainButton.Text = "❌ OFF"
+            MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
         end
     end)
+    
+    print("✅ Controles PC ativados")
 end
 
 -- ════════════════════════════════════════════════════════════
--- COMANDOS DE CHAT
+-- COMANDOS CHAT
 -- ════════════════════════════════════════════════════════════
 
-LocalPlayer.Chatted:Connect(function(msg)
-    msg = msg:lower()
+Connections.Chatted = LocalPlayer.Chatted:Connect(function(message)
+    local msg = message:lower()
     
-    if msg == "/aim" then
-        Settings.Enabled = not Settings.Enabled
-        Locked = Settings.Enabled
+    if msg == "/aim" or msg == "/aimbot" then
+        Config.Enabled = not Config.Enabled
+        IsLocked = Config.Enabled
+        print("🎯 Aimbot:", Config.Enabled and "ON" or "OFF")
         
     elseif msg == "/snap" then
-        Settings.LockMode = "Snap"
-        print("🎯 Modo: SNAP")
+        Config.LockMode = "Snap"
+        print("⚡ Modo: SNAP")
         
     elseif msg == "/smooth" then
-        Settings.LockMode = "Smooth"
-        print("🎯 Modo: SMOOTH")
+        Config.LockMode = "Smooth"
+        print("🌊 Modo: SMOOTH")
+        
+    elseif msg == "/distance" or msg == "/dist" then
+        Config.TargetMode = "Distance"
+        print("📏 Alvo: MAIS PRÓXIMO DE VOCÊ")
+        
+    elseif msg == "/cursor" then
+        Config.TargetMode = "Cursor"
+        print("🖱️ Alvo: MAIS PRÓXIMO DO CURSOR")
         
     elseif msg:match("^/pred%s") then
-        local val = tonumber(msg:match("%d+%.?%d*"))
-        if val then
-            Settings.PredictionAmount = val
-            print("📍 Predição:", val)
+        local value = tonumber(msg:match("%d+%.?%d*"))
+        if value then
+            Config.PredictionAmount = value
+            print("📍 Predição:", value)
         end
         
     elseif msg:match("^/fov%s") then
-        local val = tonumber(msg:match("%d+"))
-        if val then
-            Settings.FOVRadius = val
-            print("🎯 FOV:", val)
+        local value = tonumber(msg:match("%d+"))
+        if value then
+            Config.FOVRadius = value
+            print("🎯 FOV:", value)
         end
     end
 end)
 
+print("✅ Comandos de chat ativados")
+
 -- ════════════════════════════════════════════════════════════
--- INICIALIZAÇÃO
+-- NOTIFICAÇÃO FINAL
 -- ════════════════════════════════════════════════════════════
 
-print("╔════════════════════════════════════════════════════╗")
-print("║                                                    ║")
-print("║       🎯 AIMBOT DEFINITIVO - CARREGADO 🎯         ║")
-print("║                                                    ║")
-print("╠════════════════════════════════════════════════════╣")
-print("║                                                    ║")
+task.wait(0.5)
 
-if IsMobile then
-    print("║  📱 MOBILE:                                        ║")
-    print("║  • Use o botão na interface                        ║")
-    print("║  • Arraste a interface para mover                  ║")
-else
-    print("║  🖥️ PC:                                            ║")
-    print("║  • SEGURAR BOTÃO DIREITO = Ativar                  ║")
-    print("║  • E = Toggle ON/OFF                               ║")
-end
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "🎯 AIMBOT DEFINITIVO";
+        Text = "✅ Carregado! Use a interface.";
+        Duration = 5;
+    })
+end)
 
-print("║                                                    ║")
-print("║  💬 COMANDOS CHAT:                                 ║")
-print("║  /aim - Toggle aimbot                              ║")
-print("║  /snap - Modo instantâneo                          ║")
-print("║  /smooth - Modo suave                              ║")
-print("║  /pred 0.15 - Ajustar predição                     ║")
-print("║  /fov 300 - Ajustar FOV                            ║")
-print("║                                                    ║")
-print("║  ⚡ SNAP INSTANTÂNEO ATIVO                         ║")
-print("║  🎯 PUXA ATÉ ATRAVÉS DE PAREDES                    ║")
-print("║  🔥 INTERFACE COMPLETA                             ║")
-print("║                                                    ║")
-print("╚════════════════════════════════════════════════════╝")
+print("════════════════════════════════════════")
+print("✅ AIMBOT DEFINITIVO CARREGADO!")
+print("════════════════════════════════════════")
+print("")
+print("📱 INTERFACE:", "Visível no topo da tela")
+print("🎯 MODO:", Config.LockMode)
+print("👥 TEAM CHECK:", Config.TeamCheck and "ON" or "OFF")
+print("🔍 FOV:", Config.FOVRadius)
+print("")
+print("💬 COMANDOS:")
+print("  /aim - Toggle aimbot")
+print("  /snap - Modo instantâneo")
+print("  /smooth - Modo suave")
+print("  /distance - Alvo mais próximo de você")
+print("  /cursor - Alvo mais próximo do cursor")
+print("  /pred 0.15 - Ajustar predição")
+print("  /fov 300 - Ajustar FOV")
+print("")
+print("════════════════════════════════════════")
 
-game.StarterGui:SetCore("SendNotification", {
-    Title = "🎯 AIMBOT DEFINITIVO";
-    Text = "✅ Carregado! Use a interface.";
-    Duration = 5;
-})
-
-print("\n✅ SCRIPT CARREGADO COM SUCESSO!")
-print("🎯 Use a INTERFACE ou os COMANDOS DE CHAT")
-print("⚡ Modo SNAP ativo - Trava instantâneo!\n")
-
-return getgenv().AimbotSettings
+-- Retornar configuração
+return _G.AimbotConfig
