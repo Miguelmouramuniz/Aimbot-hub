@@ -1,582 +1,585 @@
 --[[
-    ════════════════════════════════════════════════════════════
-    🎯 AIMBOT DEFINITIVO - DELTA EXECUTOR FIXED 🎯
+    ═══════════════════════════════════════════════════════
+    ⚡ SPEED SONIC EXE 💥 - NOCLIP + WALK SPEED ⚡
     
-    ✅ SNAP INSTANTÂNEO
-    ✅ INTERFACE MOBILE COMPLETA
-    ✅ ANTI-BAN INTEGRADO
-    ✅ PREDIÇÃO AVANÇADA
-    ✅ FOV VISUAL
-    ✅ 100% COMPATÍVEL COM DELTA
-    ════════════════════════════════════════════════════════════
+    Tema: Roxo com raios pretos
+    Interface: Mobile horizontal arrastável
+    Animação: Entrada épica com raios
+    ═══════════════════════════════════════════════════════
 ]]
 
--- Aguardar carregamento
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-
-task.wait(0.3)
-
 -- Verificar duplicação
-if _G.AimbotDefinitivo then
-    warn("⚠️ Aimbot já está rodando!")
+if _G.SonicEXESpeed then
+    warn("⚠️ Speed Sonic EXE já está rodando!")
     return
 end
-_G.AimbotDefinitivo = true
+_G.SonicEXESpeed = true
 
--- ════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════
 -- SERVICES
--- ════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
-local Camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+
 local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
 
--- Detectar plataforma
-local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+-- ═══════════════════════════════════════════════════════
+-- CONFIGURAÇÕES
+-- ═══════════════════════════════════════════════════════
 
-print("════════════════════════════════════════")
-print("🎯 AIMBOT DEFINITIVO - Iniciando...")
-print("📱 Plataforma:", IsMobile and "MOBILE" or "PC")
-print("════════════════════════════════════════")
-
--- ════════════════════════════════════════════════════════════
--- CONFIGURAÇÃO
--- ════════════════════════════════════════════════════════════
-
-_G.AimbotConfig = {
-    Enabled = false,
-    TeamCheck = false, -- DESATIVADO
-    AliveCheck = true,
-    WallCheck = false,
-    
-    FOVRadius = 300,
-    FOVVisible = true,
-    
-    LockMode = "Snap",
-    Smoothness = 0.1,
-    
-    Prediction = true,
-    PredictionAmount = 0.165, -- AUMENTADO para compensar delay
-    
-    TargetPart = "Head",
-    
-    -- NOVO: Modo de prioridade
-    TargetMode = "Distance", -- "Distance" = mais perto de você | "Cursor" = mais perto do cursor
+local Config = {
+    DefaultSpeed = 16,
+    CurrentSpeed = 16,
+    MaxSpeed = 500,
+    NoclipEnabled = false,
+    SpeedEnabled = false,
 }
 
-local Config = _G.AimbotConfig
-local CurrentTarget = nil
-local FOVCircle = nil
-local IsLocked = false
 local Connections = {}
 
--- ════════════════════════════════════════════════════════════
--- FOV CIRCLE (PC)
--- ════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════
+-- CRIAR GUI
+-- ═══════════════════════════════════════════════════════
 
-if not IsMobile then
-    local success, err = pcall(function()
-        if Drawing then
-            FOVCircle = Drawing.new("Circle")
-            FOVCircle.Thickness = 2
-            FOVCircle.NumSides = 64
-            FOVCircle.Radius = Config.FOVRadius
-            FOVCircle.Filled = false
-            FOVCircle.Visible = Config.FOVVisible
-            FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-            FOVCircle.Transparency = 1
-            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-            print("✅ FOV Circle criado")
-        else
-            print("⚠️ Drawing API não disponível")
-        end
-    end)
-    
-    if not success then
-        warn("❌ Erro ao criar FOV:", err)
-    end
-end
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SonicEXEGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- ════════════════════════════════════════════════════════════
--- INTERFACE MOBILE/PC
--- ════════════════════════════════════════════════════════════
-
-local GUI = Instance.new("ScreenGui")
-GUI.Name = "AimbotDefinitivo_" .. tostring(math.random(1000, 9999))
-GUI.ResetOnSpawn = false
-GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-GUI.DisplayOrder = 999999
-
-print("📋 Criando interface...")
-
--- Frame Principal
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = GUI
-MainFrame.AnchorPoint = Vector2.new(0.5, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, 0, 0.02, 0)
-MainFrame.Size = UDim2.new(0, 380, 0, 150)
-MainFrame.Active = true
-MainFrame.Draggable = true
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 16)
-MainCorner.Parent = MainFrame
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-MainStroke.Color = Color3.fromRGB(0, 200, 255)
-MainStroke.Thickness = 3
-MainStroke.Parent = MainFrame
-
--- Título
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Name = "Title"
-TitleLabel.Parent = MainFrame
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Position = UDim2.new(0, 0, 0, 8)
-TitleLabel.Size = UDim2.new(1, 0, 0, 30)
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "🎯 AIMBOT DEFINITIVO"
-TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-TitleLabel.TextSize = 20
-TitleLabel.TextStrokeTransparency = 0.8
-
--- Botão Principal ON/OFF
-local MainButton = Instance.new("TextButton")
-MainButton.Name = "ToggleButton"
-MainButton.Parent = MainFrame
-MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
-MainButton.BorderSizePixel = 0
-MainButton.Position = UDim2.new(0.05, 0, 0.3, 0)
-MainButton.Size = UDim2.new(0.55, 0, 0.4, 0)
-MainButton.Font = Enum.Font.GothamBold
-MainButton.Text = "❌ OFF"
-MainButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MainButton.TextSize = 32
-MainButton.TextStrokeTransparency = 0.5
-MainButton.AutoButtonColor = false
-
-local MainBtnCorner = Instance.new("UICorner")
-MainBtnCorner.CornerRadius = UDim.new(0, 12)
-MainBtnCorner.Parent = MainButton
-
-local MainBtnStroke = Instance.new("UIStroke")
-MainBtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-MainBtnStroke.Color = Color3.fromRGB(255, 255, 255)
-MainBtnStroke.Thickness = 2
-MainBtnStroke.Parent = MainButton
-
--- Botão Team Check REMOVIDO - substituir por outro botão útil
-local ModeButton = Instance.new("TextButton")
-ModeButton.Name = "ModeButton"
-ModeButton.Parent = MainFrame
-ModeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 220)
-ModeButton.BorderSizePixel = 0
-ModeButton.Position = UDim2.new(0.63, 0, 0.3, 0)
-ModeButton.Size = UDim2.new(0.32, 0, 0.4, 0)
-ModeButton.Font = Enum.Font.GothamBold
-ModeButton.Text = "📏\nDIST"
-ModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ModeButton.TextSize = 16
-ModeButton.TextStrokeTransparency = 0.5
-ModeButton.AutoButtonColor = false
-
-local ModeBtnCorner = Instance.new("UICorner")
-ModeBtnCorner.CornerRadius = UDim.new(0, 12)
-ModeBtnCorner.Parent = ModeButton
-
-local ModeBtnStroke = Instance.new("UIStroke")
-ModeBtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-ModeBtnStroke.Color = Color3.fromRGB(255, 255, 255)
-ModeBtnStroke.Thickness = 2
-ModeBtnStroke.Parent = ModeButton
-
--- Status Label
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Name = "Status"
-StatusLabel.Parent = MainFrame
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Position = UDim2.new(0, 0, 0.73, 0)
-StatusLabel.Size = UDim2.new(1, 0, 0.15, 0)
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Text = "🔍 Aguardando ativação..."
-StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-StatusLabel.TextSize = 14
-
--- Info Label
-local InfoLabel = Instance.new("TextLabel")
-InfoLabel.Name = "Info"
-InfoLabel.Parent = MainFrame
-InfoLabel.BackgroundTransparency = 1
-InfoLabel.Position = UDim2.new(0, 0, 0.88, 0)
-InfoLabel.Size = UDim2.new(1, 0, 0.12, 0)
-InfoLabel.Font = Enum.Font.GothamMedium
-InfoLabel.Text = IsMobile and "📱 Mobile Mode | Arraste para mover" or "🖥️ PC: Hold Right Click | E = Toggle"
-InfoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-InfoLabel.TextSize = 11
-
--- Parent para CoreGui primeiro, senão PlayerGui
-local success = pcall(function()
-    GUI.Parent = CoreGui
+pcall(function()
+    ScreenGui.Parent = game:GetService("CoreGui")
 end)
 
-if not success or not GUI.Parent then
-    print("⚠️ CoreGui falhou, usando PlayerGui")
-    local PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if PlayerGui then
-        GUI.Parent = PlayerGui
-    else
-        LocalPlayer:WaitForChild("PlayerGui", 5)
-        GUI.Parent = LocalPlayer.PlayerGui
-    end
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
-print("✅ Interface criada em:", GUI.Parent.Name)
+-- ═══════════════════════════════════════════════════════
+-- FRAME PRINCIPAL - HORIZONTAL
+-- ═══════════════════════════════════════════════════════
 
--- ════════════════════════════════════════════════════════════
--- FUNÇÕES AIMBOT
--- ════════════════════════════════════════════════════════════
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.Size = UDim2.new(0, 500, 0, 180)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
 
-local function IsValidPlayer(player)
-    if not player or player == LocalPlayer then return false end
-    
-    if Config.TeamCheck and player.Team == LocalPlayer.Team then
-        return false
-    end
-    
-    local character = player.Character
-    if not character then return false end
-    
-    if Config.AliveCheck then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then
-            return false
-        end
-    end
-    
-    return true
-end
+-- Começar invisível para animação
+MainFrame.BackgroundTransparency = 1
+MainFrame.Size = UDim2.new(0, 0, 0, 0)
 
-local function GetClosestTarget()
-    local closestPlayer = nil
-    local shortestDistance = math.huge -- Mudado para sempre buscar o mais próximo
-    
-    local myPosition = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myPosition then return nil end
-    myPosition = myPosition.Position
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if IsValidPlayer(player) then
-            local character = player.Character
-            local targetPart = character:FindFirstChild(Config.TargetPart)
-            
-            if not targetPart then
-                targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-            end
-            
-            if targetPart then
-                local screenPosition, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                
-                if onScreen then
-                    local distance
-                    
-                    if Config.TargetMode == "Distance" then
-                        -- DISTÂNCIA DO JOGADOR (3D)
-                        distance = (targetPart.Position - myPosition).Magnitude
-                    else
-                        -- DISTÂNCIA DO CURSOR (2D)
-                        local mousePos
-                        if IsMobile then
-                            mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                        else
-                            mousePos = UserInputService:GetMouseLocation()
-                        end
-                        distance = (Vector2.new(screenPosition.X, screenPosition.Y) - mousePos).Magnitude
-                    end
-                    
-                    if distance < shortestDistance then
-                        if not Config.WallCheck then
-                            closestPlayer = player
-                            shortestDistance = distance
-                        else
-                            -- Wall check
-                            local origin = Camera.CFrame.Position
-                            local direction = (targetPart.Position - origin)
-                            
-                            local rayParams = RaycastParams.new()
-                            rayParams.FilterDescendantsInstances = {LocalPlayer.Character, character}
-                            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                            
-                            local rayResult = workspace:Raycast(origin, direction, rayParams)
-                            
-                            if not rayResult then
-                                closestPlayer = player
-                                shortestDistance = distance
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    return closestPlayer
-end
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 20)
+MainCorner.Parent = MainFrame
 
-local function AimAtTarget()
-    if not IsLocked or not Config.Enabled then return end
-    if not CurrentTarget or not CurrentTarget.Character then return end
-    
-    local targetPart = CurrentTarget.Character:FindFirstChild(Config.TargetPart)
-    if not targetPart then
-        targetPart = CurrentTarget.Character:FindFirstChild("Head")
-    end
-    if not targetPart then return end
-    
-    -- Posição do alvo
-    local targetPosition = targetPart.Position
-    
-    -- PREDIÇÃO AVANÇADA
-    if Config.Prediction then
-        local velocity = targetPart.AssemblyLinearVelocity or targetPart.Velocity or Vector3.zero
+-- Borda com gradiente roxo
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(150, 0, 255)
+MainStroke.Thickness = 4
+MainStroke.Transparency = 1
+MainStroke.Parent = MainFrame
+
+-- Gradiente roxo
+local Gradient = Instance.new("UIGradient")
+Gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 0, 100)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 0, 60)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 0, 40))
+}
+Gradient.Rotation = 45
+Gradient.Parent = MainFrame
+
+-- ═══════════════════════════════════════════════════════
+-- EFEITO DE RAIOS (BACKGROUND)
+-- ═══════════════════════════════════════════════════════
+
+local function CreateLightning()
+    for i = 1, 5 do
+        local Lightning = Instance.new("Frame")
+        Lightning.Name = "Lightning" .. i
+        Lightning.Parent = MainFrame
+        Lightning.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        Lightning.BorderSizePixel = 0
+        Lightning.Position = UDim2.new(math.random(0, 100) / 100, 0, 0, 0)
+        Lightning.Size = UDim2.new(0, 2, 1, 0)
+        Lightning.ZIndex = 0
+        Lightning.Rotation = math.random(-5, 5)
         
-        -- Calcular distância para ajustar predição dinamicamente
-        local distance = (targetPosition - Camera.CFrame.Position).Magnitude
-        local distanceMultiplier = math.clamp(distance / 100, 0.5, 2) -- Ajusta predição baseado na distância
-        
-        -- Aplicar predição com multiplicador
-        targetPosition = targetPosition + (velocity * Config.PredictionAmount * distanceMultiplier)
-    end
-    
-    local cameraPosition = Camera.CFrame.Position
-    local aimCFrame = CFrame.new(cameraPosition, targetPosition)
-    
-    -- Aplicar lock INSTANTÂNEO
-    Camera.CFrame = aimCFrame
-end
-
-local function UpdateFOV()
-    if FOVCircle then
-        pcall(function()
-            local mousePos = UserInputService:GetMouseLocation()
-            FOVCircle.Position = mousePos
-            FOVCircle.Radius = Config.FOVRadius
-            FOVCircle.Visible = Config.FOVVisible and Config.Enabled
+        -- Animar raios
+        spawn(function()
+            while Lightning.Parent do
+                local tween = TweenService:Create(Lightning, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
+                    BackgroundTransparency = math.random(50, 90) / 100
+                })
+                tween:Play()
+                wait(0.1)
+            end
         end)
     end
 end
 
-local function UpdateStatus()
-    pcall(function()
-        if CurrentTarget then
-            StatusLabel.Text = "🎯 TRAVADO: " .. CurrentTarget.Name
-            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-        else
-            if Config.Enabled then
-                StatusLabel.Text = "🔍 Procurando alvo..."
-                StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-            else
-                StatusLabel.Text = "⭕ Desativado"
-                StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-            end
-        end
+CreateLightning()
+
+-- ═══════════════════════════════════════════════════════
+-- TÍTULO COM RAIOS
+-- ═══════════════════════════════════════════════════════
+
+local TitleFrame = Instance.new("Frame")
+TitleFrame.Name = "TitleFrame"
+TitleFrame.Parent = MainFrame
+TitleFrame.BackgroundTransparency = 1
+TitleFrame.Position = UDim2.new(0, 15, 0, 10)
+TitleFrame.Size = UDim2.new(1, -30, 0, 40)
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Parent = TitleFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "⚡ SPEED SONIC EXE 💥"
+Title.TextColor3 = Color3.fromRGB(255, 50, 255)
+Title.TextSize = 24
+Title.TextStrokeTransparency = 0.5
+Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+
+-- Efeito de brilho no título
+local TitleGlow = Instance.new("TextLabel")
+TitleGlow.Name = "TitleGlow"
+TitleGlow.Parent = TitleFrame
+TitleGlow.BackgroundTransparency = 1
+TitleGlow.Position = UDim2.new(0, 2, 0, 2)
+TitleGlow.Size = UDim2.new(1, 0, 1, 0)
+TitleGlow.Font = Enum.Font.GothamBold
+TitleGlow.Text = "⚡ SPEED SONIC EXE 💥"
+TitleGlow.TextColor3 = Color3.fromRGB(150, 0, 255)
+TitleGlow.TextSize = 24
+TitleGlow.TextTransparency = 0.5
+TitleGlow.ZIndex = 0
+
+-- Animar brilho
+spawn(function()
+    while TitleGlow.Parent do
+        TweenService:Create(TitleGlow, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            TextTransparency = 0.8
+        }):Play()
+        wait(0.5)
+        TweenService:Create(TitleGlow, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            TextTransparency = 0.3
+        }):Play()
+        wait(0.5)
+    end
+end)
+
+-- ═══════════════════════════════════════════════════════
+-- CONTAINER DOS BOTÕES
+-- ═══════════════════════════════════════════════════════
+
+local ButtonContainer = Instance.new("Frame")
+ButtonContainer.Name = "ButtonContainer"
+ButtonContainer.Parent = MainFrame
+ButtonContainer.BackgroundTransparency = 1
+ButtonContainer.Position = UDim2.new(0, 15, 0, 60)
+ButtonContainer.Size = UDim2.new(1, -30, 0, 110)
+
+-- ═══════════════════════════════════════════════════════
+-- FUNÇÃO PARA CRIAR BOTÃO COM ESTILO RAIO
+-- ═══════════════════════════════════════════════════════
+
+local function CreateLightningButton(name, text, position, color)
+    local Button = Instance.new("TextButton")
+    Button.Name = name
+    Button.Parent = ButtonContainer
+    Button.BackgroundColor3 = color
+    Button.BorderSizePixel = 0
+    Button.Position = position
+    Button.Size = UDim2.new(0, 150, 0, 50)
+    Button.Font = Enum.Font.GothamBold
+    Button.Text = text
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 16
+    Button.TextStrokeTransparency = 0.5
+    Button.AutoButtonColor = false
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 12)
+    BtnCorner.Parent = Button
+    
+    -- Borda estilo raio
+    local BtnStroke = Instance.new("UIStroke")
+    BtnStroke.Color = Color3.fromRGB(150, 0, 255)
+    BtnStroke.Thickness = 3
+    BtnStroke.Parent = Button
+    
+    -- Gradiente
+    local BtnGradient = Instance.new("UIGradient")
+    BtnGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, color),
+        ColorSequenceKeypoint.new(1, Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7))
+    }
+    BtnGradient.Rotation = 45
+    BtnGradient.Parent = Button
+    
+    -- Efeito de raio interno
+    local LightningEffect = Instance.new("Frame")
+    LightningEffect.Name = "Lightning"
+    LightningEffect.Parent = Button
+    LightningEffect.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    LightningEffect.BackgroundTransparency = 0.9
+    LightningEffect.BorderSizePixel = 0
+    LightningEffect.Position = UDim2.new(0, 0, 0, 0)
+    LightningEffect.Size = UDim2.new(0, 0, 1, 0)
+    
+    local LightCorner = Instance.new("UICorner")
+    LightCorner.CornerRadius = UDim.new(0, 12)
+    LightCorner.Parent = LightningEffect
+    
+    -- Animação de clique
+    Button.MouseButton1Down:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.1), {
+            Size = UDim2.new(0, 145, 0, 48)
+        }):Play()
+        
+        -- Efeito de raio ao clicar
+        TweenService:Create(LightningEffect, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1
+        }):Play()
     end)
+    
+    Button.MouseButton1Up:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.1), {
+            Size = UDim2.new(0, 150, 0, 50)
+        }):Play()
+        
+        LightningEffect.Size = UDim2.new(0, 0, 1, 0)
+        LightningEffect.BackgroundTransparency = 0.9
+    end)
+    
+    return Button
 end
 
--- ════════════════════════════════════════════════════════════
--- LOOPS PRINCIPAIS
--- ════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════
+-- CRIAR BOTÕES
+-- ═══════════════════════════════════════════════════════
 
-Connections.Heartbeat = RunService.Heartbeat:Connect(function()
-    UpdateFOV()
-    UpdateStatus()
-    
-    if Config.Enabled and IsLocked then
-        CurrentTarget = GetClosestTarget()
-    end
-end)
+-- Botão Speed
+local SpeedButton = CreateLightningButton(
+    "SpeedButton",
+    "⚡ SPEED: OFF",
+    UDim2.new(0, 0, 0, 0),
+    Color3.fromRGB(60, 0, 100)
+)
 
-Connections.RenderStepped = RunService.RenderStepped:Connect(function()
-    if Config.Enabled and IsLocked and CurrentTarget then
-        AimAtTarget()
-    end
-end)
+-- Botão Noclip
+local NoclipButton = CreateLightningButton(
+    "NoclipButton",
+    "👻 NOCLIP: OFF",
+    UDim2.new(0, 165, 0, 0),
+    Color3.fromRGB(80, 0, 120)
+)
 
-print("✅ Loops iniciados")
+-- Botão Reset
+local ResetButton = CreateLightningButton(
+    "ResetButton",
+    "🔄 RESET",
+    UDim2.new(0, 330, 0, 0),
+    Color3.fromRGB(100, 0, 80)
+)
 
--- ════════════════════════════════════════════════════════════
--- EVENTOS GUI
--- ════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════
+-- CONTROLE DE VELOCIDADE
+-- ═══════════════════════════════════════════════════════
 
-MainButton.MouseButton1Click:Connect(function()
-    Config.Enabled = not Config.Enabled
-    IsLocked = Config.Enabled
-    
-    if Config.Enabled then
-        MainButton.Text = "✅ ON"
-        MainButton.BackgroundColor3 = Color3.fromRGB(20, 220, 20)
-        MainStroke.Color = Color3.fromRGB(0, 255, 100)
-    else
-        MainButton.Text = "❌ OFF"
-        MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
-        MainStroke.Color = Color3.fromRGB(0, 200, 255)
-    end
-    
-    print("🎯 Aimbot:", Config.Enabled and "ON" or "OFF")
-end)
+local SpeedContainer = Instance.new("Frame")
+SpeedContainer.Name = "SpeedContainer"
+SpeedContainer.Parent = ButtonContainer
+SpeedContainer.BackgroundTransparency = 1
+SpeedContainer.Position = UDim2.new(0, 0, 0, 60)
+SpeedContainer.Size = UDim2.new(1, 0, 0, 45)
 
-ModeButton.MouseButton1Click:Connect(function()
-    if Config.TargetMode == "Distance" then
-        Config.TargetMode = "Cursor"
-        ModeButton.Text = "🖱️\nCURSOR"
-        ModeButton.BackgroundColor3 = Color3.fromRGB(220, 100, 220)
-        print("🖱️ Modo: CURSOR (mais próximo do cursor)")
-    else
-        Config.TargetMode = "Distance"
-        ModeButton.Text = "📏\nDIST"
-        ModeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 220)
-        print("📏 Modo: DISTANCE (mais próximo de você)")
-    end
-end)
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Name = "SpeedLabel"
+SpeedLabel.Parent = SpeedContainer
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Position = UDim2.new(0, 0, 0, 0)
+SpeedLabel.Size = UDim2.new(0, 150, 0, 20)
+SpeedLabel.Font = Enum.Font.GothamBold
+SpeedLabel.Text = "💨 VELOCIDADE: 16"
+SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedLabel.TextSize = 14
+SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-print("✅ Eventos GUI conectados")
+-- Slider
+local SliderBG = Instance.new("Frame")
+SliderBG.Name = "SliderBG"
+SliderBG.Parent = SpeedContainer
+SliderBG.BackgroundColor3 = Color3.fromRGB(20, 0, 40)
+SliderBG.BorderSizePixel = 0
+SliderBG.Position = UDim2.new(0, 0, 0, 25)
+SliderBG.Size = UDim2.new(0, 320, 0, 15)
 
--- ════════════════════════════════════════════════════════════
--- CONTROLES PC
--- ════════════════════════════════════════════════════════════
+local SliderCorner = Instance.new("UICorner")
+SliderCorner.CornerRadius = UDim.new(1, 0)
+SliderCorner.Parent = SliderBG
 
-if not IsMobile then
-    Connections.InputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
+local SliderStroke = Instance.new("UIStroke")
+SliderStroke.Color = Color3.fromRGB(150, 0, 255)
+SliderStroke.Thickness = 2
+SliderStroke.Parent = SliderBG
+
+local SliderFill = Instance.new("Frame")
+SliderFill.Name = "SliderFill"
+SliderFill.Parent = SliderBG
+SliderFill.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
+SliderFill.BorderSizePixel = 0
+SliderFill.Size = UDim2.new(0, 0, 1, 0)
+
+local FillCorner = Instance.new("UICorner")
+FillCorner.CornerRadius = UDim.new(1, 0)
+FillCorner.Parent = SliderFill
+
+-- Gradiente no slider
+local SliderGradient = Instance.new("UIGradient")
+SliderGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 0, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 255))
+}
+SliderGradient.Parent = SliderFill
+
+-- Botões +/-
+local MinusBtn = Instance.new("TextButton")
+MinusBtn.Name = "MinusBtn"
+MinusBtn.Parent = SpeedContainer
+MinusBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
+MinusBtn.BorderSizePixel = 0
+MinusBtn.Position = UDim2.new(0, 330, 0, 25)
+MinusBtn.Size = UDim2.new(0, 70, 0, 15)
+MinusBtn.Font = Enum.Font.GothamBold
+MinusBtn.Text = "➖"
+MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinusBtn.TextSize = 12
+
+local MinusCorner = Instance.new("UICorner")
+MinusCorner.CornerRadius = UDim.new(1, 0)
+MinusCorner.Parent = MinusBtn
+
+local PlusBtn = Instance.new("TextButton")
+PlusBtn.Name = "PlusBtn"
+PlusBtn.Parent = SpeedContainer
+PlusBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
+PlusBtn.BorderSizePixel = 0
+PlusBtn.Position = UDim2.new(0, 410, 0, 25)
+PlusBtn.Size = UDim2.new(0, 70, 0, 15)
+PlusBtn.Font = Enum.Font.GothamBold
+PlusBtn.Text = "➕"
+PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlusBtn.TextSize = 12
+
+local PlusCorner = Instance.new("UICorner")
+PlusCorner.CornerRadius = UDim.new(1, 0)
+PlusCorner.Parent = PlusBtn
+
+-- ═══════════════════════════════════════════════════════
+-- ANIMAÇÃO DE ENTRADA
+-- ═══════════════════════════════════════════════════════
+
+local function PlayIntroAnimation()
+    -- Raios aparecem primeiro
+    for i = 1, 3 do
+        local Lightning = Instance.new("ImageLabel")
+        Lightning.Name = "IntroLightning"
+        Lightning.Parent = ScreenGui
+        Lightning.BackgroundTransparency = 1
+        Lightning.Position = UDim2.new(0.5, math.random(-200, 200), 0.5, math.random(-100, 100))
+        Lightning.Size = UDim2.new(0, 100, 0, 100)
+        Lightning.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+        Lightning.ImageColor3 = Color3.fromRGB(150, 0, 255)
+        Lightning.ImageTransparency = 1
+        Lightning.ZIndex = 10
         
-        if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            IsLocked = true
-            Config.Enabled = true
+        TweenService:Create(Lightning, TweenInfo.new(0.3), {
+            ImageTransparency = 0,
+            Rotation = 360
+        }):Play()
+        
+        wait(0.1)
+        
+        TweenService:Create(Lightning, TweenInfo.new(0.3), {
+            ImageTransparency = 1
+        }):Play()
+        
+        game:GetService("Debris"):AddItem(Lightning, 0.6)
+    end
+    
+    wait(0.2)
+    
+    -- Janela aparece
+    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 500, 0, 180),
+        BackgroundTransparency = 0
+    }):Play()
+    
+    TweenService:Create(MainStroke, TweenInfo.new(0.5), {
+        Transparency = 0
+    }):Play()
+    
+    wait(0.3)
+    
+    -- Botões aparecem
+    for _, button in pairs(ButtonContainer:GetChildren()) do
+        if button:IsA("TextButton") or button:IsA("Frame") then
+            button.Position = button.Position + UDim2.new(0, -50, 0, 0)
+            TweenService:Create(button, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = button.Position + UDim2.new(0, 50, 0, 0)
+            }):Play()
+            wait(0.1)
+        end
+    end
+end
+
+-- ═══════════════════════════════════════════════════════
+-- FUNÇÕES
+-- ═══════════════════════════════════════════════════════
+
+local function UpdateSpeedDisplay(speed)
+    Config.CurrentSpeed = speed
+    SpeedLabel.Text = "💨 VELOCIDADE: " .. math.floor(speed)
+    
+    local percent = math.min(speed / Config.MaxSpeed, 1)
+    TweenService:Create(SliderFill, TweenInfo.new(0.3), {
+        Size = UDim2.new(percent, 0, 1, 0)
+    }):Play()
+end
+
+local function SetSpeed(enabled)
+    Config.SpeedEnabled = enabled
+    
+    if enabled then
+        Humanoid.WalkSpeed = Config.CurrentSpeed
+        SpeedButton.Text = "⚡ SPEED: ON"
+        SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        Humanoid.WalkSpeed = Config.DefaultSpeed
+        SpeedButton.Text = "⚡ SPEED: OFF"
+        SpeedButton.BackgroundColor3 = Color3.fromRGB(60, 0, 100)
+    end
+end
+
+local function SetNoclip(enabled)
+    Config.NoclipEnabled = enabled
+    
+    if enabled then
+        Connections.Noclip = RunService.Stepped:Connect(function()
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+        
+        NoclipButton.Text = "👻 NOCLIP: ON"
+        NoclipButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        if Connections.Noclip then
+            Connections.Noclip:Disconnect()
         end
         
-        if input.KeyCode == Enum.KeyCode.E then
-            Config.Enabled = not Config.Enabled
-            IsLocked = Config.Enabled
-            
-            -- Atualizar botão
-            if Config.Enabled then
-                MainButton.Text = "✅ ON"
-                MainButton.BackgroundColor3 = Color3.fromRGB(20, 220, 20)
-            else
-                MainButton.Text = "❌ OFF"
-                MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
             end
         end
         
-        if input.KeyCode == Enum.KeyCode.T then
-            local parts = {"Head", "UpperTorso", "HumanoidRootPart"}
-            local currentIndex = table.find(parts, Config.TargetPart) or 1
-            Config.TargetPart = parts[(currentIndex % #parts) + 1]
-            print("🎯 Alvo:", Config.TargetPart)
-        end
-    end)
-    
-    Connections.InputEnded = UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            IsLocked = false
-            Config.Enabled = false
-            
-            MainButton.Text = "❌ OFF"
-            MainButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
-        end
-    end)
-    
-    print("✅ Controles PC ativados")
+        NoclipButton.Text = "👻 NOCLIP: OFF"
+        NoclipButton.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
+    end
 end
 
--- ════════════════════════════════════════════════════════════
--- COMANDOS CHAT
--- ════════════════════════════════════════════════════════════
+local function ResetAll()
+    SetSpeed(false)
+    SetNoclip(false)
+    UpdateSpeedDisplay(Config.DefaultSpeed)
+end
 
-Connections.Chatted = LocalPlayer.Chatted:Connect(function(message)
-    local msg = message:lower()
-    
-    if msg == "/aim" or msg == "/aimbot" then
-        Config.Enabled = not Config.Enabled
-        IsLocked = Config.Enabled
-        print("🎯 Aimbot:", Config.Enabled and "ON" or "OFF")
-        
-    elseif msg == "/snap" then
-        Config.LockMode = "Snap"
-        print("⚡ Modo: SNAP")
-        
-    elseif msg == "/smooth" then
-        Config.LockMode = "Smooth"
-        print("🌊 Modo: SMOOTH")
-        
-    elseif msg == "/distance" or msg == "/dist" then
-        Config.TargetMode = "Distance"
-        print("📏 Alvo: MAIS PRÓXIMO DE VOCÊ")
-        
-    elseif msg == "/cursor" then
-        Config.TargetMode = "Cursor"
-        print("🖱️ Alvo: MAIS PRÓXIMO DO CURSOR")
-        
-    elseif msg:match("^/pred%s") then
-        local value = tonumber(msg:match("%d+%.?%d*"))
-        if value then
-            Config.PredictionAmount = value
-            print("📍 Predição:", value)
-        end
-        
-    elseif msg:match("^/fov%s") then
-        local value = tonumber(msg:match("%d+"))
-        if value then
-            Config.FOVRadius = value
-            print("🎯 FOV:", value)
-        end
+-- ═══════════════════════════════════════════════════════
+-- EVENTOS
+-- ═══════════════════════════════════════════════════════
+
+SpeedButton.MouseButton1Click:Connect(function()
+    SetSpeed(not Config.SpeedEnabled)
+end)
+
+NoclipButton.MouseButton1Click:Connect(function()
+    SetNoclip(not Config.NoclipEnabled)
+end)
+
+ResetButton.MouseButton1Click:Connect(function()
+    ResetAll()
+end)
+
+MinusBtn.MouseButton1Click:Connect(function()
+    local newSpeed = math.max(Config.CurrentSpeed - 10, Config.DefaultSpeed)
+    UpdateSpeedDisplay(newSpeed)
+    if Config.SpeedEnabled then
+        Humanoid.WalkSpeed = newSpeed
     end
 end)
 
-print("✅ Comandos de chat ativados")
-
--- ════════════════════════════════════════════════════════════
--- NOTIFICAÇÃO FINAL
--- ════════════════════════════════════════════════════════════
-
-task.wait(0.5)
-
-pcall(function()
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "🎯 AIMBOT DEFINITIVO";
-        Text = "✅ Carregado! Use a interface.";
-        Duration = 5;
-    })
+PlusBtn.MouseButton1Click:Connect(function()
+    local newSpeed = math.min(Config.CurrentSpeed + 10, Config.MaxSpeed)
+    UpdateSpeedDisplay(newSpeed)
+    if Config.SpeedEnabled then
+        Humanoid.WalkSpeed = newSpeed
+    end
 end)
 
-print("════════════════════════════════════════")
-print("✅ AIMBOT DEFINITIVO CARREGADO!")
-print("════════════════════════════════════════")
-print("")
-print("📱 INTERFACE:", "Visível no topo da tela")
-print("🎯 MODO:", Config.LockMode)
-print("👥 TEAM CHECK:", Config.TeamCheck and "ON" or "OFF")
-print("🔍 FOV:", Config.FOVRadius)
-print("")
-print("💬 COMANDOS:")
-print("  /aim - Toggle aimbot")
-print("  /snap - Modo instantâneo")
-print("  /smooth - Modo suave")
-print("  /distance - Alvo mais próximo de você")
-print("  /cursor - Alvo mais próximo do cursor")
-print("  /pred 0.15 - Ajustar predição")
-print("  /fov 300 - Ajustar FOV")
-print("")
-print("════════════════════════════════════════")
+-- Atualizar speed quando mudar
+Connections.SpeedUpdate = RunService.Heartbeat:Connect(function()
+    if Config.SpeedEnabled then
+        Humanoid.WalkSpeed = Config.CurrentSpeed
+    end
+end)
 
--- Retornar configuração
-return _G.AimbotConfig
+-- Reset ao morrer
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    ResetAll()
+end)
+
+-- ═══════════════════════════════════════════════════════
+-- INICIALIZAÇÃO
+-- ═══════════════════════════════════════════════════════
+
+UpdateSpeedDisplay(Config.DefaultSpeed)
+PlayIntroAnimation()
+
+print("╔════════════════════════════════════════╗")
+print("║  ⚡ SPEED SONIC EXE 💥 - ATIVADO ⚡   ║")
+print("╠════════════════════════════════════════╣")
+print("║                                        ║")
+print("║  ⚡ Speed: Velocidade personalizável  ║")
+print("║  👻 Noclip: Atravessar paredes        ║")
+print("║  🎨 Tema: Roxo com raios pretos       ║")
+print("║  📱 Interface: Mobile horizontal       ║")
+print("║  ✨ Animação: Entrada épica           ║")
+print("║                                        ║")
+print("╚════════════════════════════════════════╝")
+
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "⚡ SPEED SONIC EXE 💥";
+    Text = "Carregado com sucesso!";
+    Duration = 5;
+})
