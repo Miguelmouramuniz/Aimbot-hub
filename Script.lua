@@ -1,8 +1,7 @@
 --[[ 
     HORIONX HUB V7 - SUPREME EDITION ⚡
-    MONITORAMENTO: FPS + PING (ABA VISUAL)
-    MELHORIA: ESP BONE + CHECK DE PAREDE + FILTRO DE ARENA
-    STATUS: TUDO SOB CONTROLE, MIGUEL! 😈
+    NOVIDADES: PULO INFINITO, AIM HEAD E CORREÇÃO DO SPINBOT
+    ESTRUTURA: MANTIDA COM SUCESSO!
 ]]
 
 task.wait(0.5)
@@ -17,13 +16,16 @@ local LocalPlayer = Players.LocalPlayer
 
 local originalMaterials = {}
 local originalShadows = Lighting.GlobalShadows
+_G.AliadosManuais = _G.AliadosManuais or {} 
 
 if _G.PainelAtivo then pcall(function() _G.PainelAtivo:Destroy() end) end
 
+-- [DOCUMENTAÇÃO] Novas variáveis adicionadas: AimHead e PuloInfinito
 _G.Configs = _G.Configs or {
-    Aimbot = false, AimLock = false, AimForca = 0.15, DistanciaMax = 350,
+    Aimbot = false, AimLock = false, AimForca = 0.15, DistanciaMax = 350, AimHead = true,
     ESP = false, SpinBot = false, SpinVelocidade = 50,
-    AntiLag = false, Shaders = false, AntiShakeVisual = false
+    AntiLag = false, Shaders = false, AntiShakeVisual = false,
+    PuloInfinito = false
 }
 
 local CC = Lighting:FindFirstChild("HX_CC") or Instance.new("ColorCorrectionEffect", Lighting)
@@ -57,7 +59,7 @@ local function AplicarAntiLag(estado)
 end
 
 -- ==========================================
--- 1. INTERFACE HORIONX (ESTRUTURA ORIGINAL)
+-- 1. INTERFACE HORIONX
 -- ==========================================
 local Screen = Instance.new("ScreenGui", game:GetService("CoreGui")); Screen.Name = "Horionx_Supreme"; _G.PainelAtivo = Screen
 
@@ -95,6 +97,11 @@ local function CreateToggle(parent, text, key)
         ind.BackgroundColor3 = _G.Configs[key] and Color3.fromRGB(138, 43, 226) or Color3.fromRGB(50, 20, 60)
         if key == "AntiLag" then AplicarAntiLag(_G.Configs[key]) end
         if key == "Shaders" then CC.Enabled = _G.Configs.Shaders; if _G.Configs.Shaders then CC.Saturation = 0.6; CC.Contrast = 0.4 end end
+        
+        -- [DOCUMENTAÇÃO] Restaura o AutoRotate da física se o SpinBot for desligado
+        if key == "SpinBot" and not _G.Configs.SpinBot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.AutoRotate = true
+        end
     end)
 end
 
@@ -117,12 +124,50 @@ local function CreateSlider(parent, text, min, max, key)
 end
 
 local TabA = CreateTab("Combate"); local TabV = CreateTab("Visual"); local TabE = CreateTab("Extras")
-CreateToggle(TabA, "Aimbot Visível", "Aimbot"); CreateToggle(TabA, "AimLock (Varar)", "AimLock")
+
+CreateToggle(TabA, "Aimbot Visível", "Aimbot"); 
+CreateToggle(TabA, "AimLock (Varar)", "AimLock")
+CreateToggle(TabA, "Mirar na Cabeça", "AimHead") -- [DOCUMENTAÇÃO] Novo botão de Aim Head
 CreateSlider(TabA, "Força Suave", 0.01, 1, "AimForca")
 CreateSlider(TabA, "Raio Arena", 50, 600, "DistanciaMax")
+
 CreateToggle(TabV, "ESP SKELETON VIP", "ESP"); CreateToggle(TabV, "ANTI-LAG NITRO", "AntiLag"); CreateToggle(TabV, "SHADER RTX", "Shaders")
-CreateToggle(TabE, "Anti-Shake", "AntiShakeVisual"); CreateToggle(TabE, "SpinBot", "SpinBot")
+
+CreateToggle(TabE, "Pulo Infinito", "PuloInfinito") -- [DOCUMENTAÇÃO] Novo botão de Pulo Infinito
+CreateToggle(TabE, "Anti-Shake", "AntiShakeVisual")
+CreateToggle(TabE, "SpinBot", "SpinBot")
 CreateSlider(TabE, "Velocidade Spin", 10, 300, "SpinVelocidade")
+
+-- ==========================================
+-- LISTA DE JOGADORES (ALIADOS)
+-- ==========================================
+local ListTitle = Instance.new("TextLabel", TabE)
+ListTitle.Size = UDim2.new(1, -10, 0, 20); ListTitle.BackgroundTransparency = 1; ListTitle.Text = "EXCEÇÕES (AIMBOT IGNORA):"; ListTitle.TextColor3 = Color3.fromRGB(180, 50, 255); ListTitle.Font = "GothamBold"; ListTitle.TextSize = 10
+
+local PlayerScroll = Instance.new("ScrollingFrame", TabE)
+PlayerScroll.Size = UDim2.new(1, -10, 0, 100); PlayerScroll.BackgroundColor3 = Color3.fromRGB(15, 10, 25); PlayerScroll.ScrollBarThickness = 2; PlayerScroll.CanvasSize = UDim2.new(0,0,0,0)
+Instance.new("UICorner", PlayerScroll)
+local ListLayout = Instance.new("UIListLayout", PlayerScroll); ListLayout.Padding = UDim.new(0, 5)
+
+local function UpdatePlayerList()
+    for _, v in pairs(PlayerScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local pBtn = Instance.new("TextButton", PlayerScroll)
+            pBtn.Size = UDim2.new(1, -10, 0, 25); pBtn.BackgroundColor3 = _G.AliadosManuais[p.Name] and Color3.fromRGB(60, 20, 100) or Color3.fromRGB(25, 15, 35)
+            pBtn.Text = p.Name; pBtn.TextColor3 = _G.AliadosManuais[p.Name] and Color3.new(1,1,1) or Color3.new(0.7,0.7,0.7); pBtn.Font = "Gotham"; pBtn.TextSize = 12
+            Instance.new("UICorner", pBtn)
+            
+            pBtn.MouseButton1Click:Connect(function()
+                _G.AliadosManuais[p.Name] = not _G.AliadosManuais[p.Name]
+                pBtn.BackgroundColor3 = _G.AliadosManuais[p.Name] and Color3.fromRGB(60, 20, 100) or Color3.fromRGB(25, 15, 35)
+                pBtn.TextColor3 = _G.AliadosManuais[p.Name] and Color3.new(1,1,1) or Color3.new(0.7,0.7,0.7)
+            end)
+        end
+    end
+    PlayerScroll.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y)
+end
+Players.PlayerAdded:Connect(UpdatePlayerList); Players.PlayerRemoving:Connect(UpdatePlayerList); UpdatePlayerList()
 
 local StatFrame = Instance.new("Frame", TabV); StatFrame.Size = UDim2.new(1, -10, 0, 30); StatFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 20); Instance.new("UICorner", StatFrame)
 local FpsLabel = Instance.new("TextLabel", StatFrame); FpsLabel.Size = UDim2.new(0.5, -10, 1, 0); FpsLabel.Position = UDim2.new(0, 10, 0, 0); FpsLabel.BackgroundTransparency = 1; FpsLabel.Text = "fps: 0"; FpsLabel.TextColor3 = Color3.new(1,1,1); FpsLabel.Font = "Gotham"; FpsLabel.TextSize = 10; FpsLabel.TextXAlignment = "Left"
@@ -132,7 +177,17 @@ OpenBtn.MouseButton1Click:Connect(function() Main.Visible = true; OpenBtn.Visibl
 TabA.Visible = true
 
 -- ==========================================
--- 2. MOTORES (MELHORADOS)
+-- EVENTOS INDEPENDENTES (PULO INFINITO)
+-- ==========================================
+-- [DOCUMENTAÇÃO] Este evento deteta sempre que o jogador tenta pular
+UserInputService.JumpRequest:Connect(function()
+    if _G.Configs.PuloInfinito and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- ==========================================
+-- 2. MOTORES PRINCIPAIS
 -- ==========================================
 local lastTime = tick(); local frameCount = 0
 RunService.Heartbeat:Connect(function()
@@ -143,7 +198,11 @@ RunService.Heartbeat:Connect(function()
         frameCount = 0; lastTime = tick()
     end
 
-    if _G.Configs.SpinBot and LocalPlayer.Character then
+    -- [DOCUMENTAÇÃO] SpinBot Corrigido: Desativa o AutoRotate nativo do jogo
+    if _G.Configs.SpinBot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        if LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.AutoRotate = false
+        end
         LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(_G.Configs.SpinVelocidade), 0)
     end
 
@@ -154,10 +213,8 @@ RunService.Heartbeat:Connect(function()
             local esp = char:FindFirstChild("HX_ESP") or Instance.new("Highlight", char); esp.Name = "HX_ESP"
             local dist = (LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
             
-            if _G.Configs.ESP and char.Humanoid.Health > 0 and dist <= _G.Configs.DistanciaMax then
+            if _G.Configs.ESP and char.Humanoid.Health > 0 and dist <= _G.Configs.DistanciaMax and not _G.AliadosManuais[p.Name] then
                 esp.Enabled = true; esp.FillTransparency = 0.5; esp.OutlineColor = Color3.fromRGB(138, 43, 226)
-                
-                -- Barra de Vida Lateral
                 local hum = char:FindFirstChild("Humanoid")
                 local bg = char.HumanoidRootPart:FindFirstChild("LifeGui") or Instance.new("BillboardGui", char.HumanoidRootPart)
                 bg.Name = "LifeGui"; bg.AlwaysOnTop = true; bg.Size = UDim2.new(4,0,5,0); bg.ExtentsOffset = Vector3.new(2.5, 0, 0)
@@ -172,15 +229,19 @@ end)
 
 RunService.RenderStepped:Connect(function()
     local target = nil; local menorDist = _G.Configs.DistanciaMax
+    
+    -- [DOCUMENTAÇÃO] Lógica do Aim Head: Decide qual parte do corpo focar
+    local partAlvo = _G.Configs.AimHead and "Head" or "HumanoidRootPart"
+
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character.Humanoid.Health > 0 then
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(partAlvo) and p.Character.Humanoid.Health > 0 and not _G.AliadosManuais[p.Name] then
             local dist = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
             if dist < menorDist then
-                local head = p.Character.Head
+                local objAlvo = p.Character[partAlvo]
                 if _G.Configs.AimLock then
-                    target = head; menorDist = dist
-                elseif _G.Configs.Aimbot and IsVisible(head) then
-                    target = head; menorDist = dist
+                    target = objAlvo; menorDist = dist
+                elseif _G.Configs.Aimbot and IsVisible(objAlvo) then
+                    target = objAlvo; menorDist = dist
                 end
             end
         end
