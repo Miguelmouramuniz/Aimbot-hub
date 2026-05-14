@@ -1,585 +1,192 @@
---[[
-    ═══════════════════════════════════════════════════════
-    ⚡ SPEED SONIC EXE 💥 - NOCLIP + WALK SPEED ⚡
-    
-    Tema: Roxo com raios pretos
-    Interface: Mobile horizontal arrastável
-    Animação: Entrada épica com raios
-    ═══════════════════════════════════════════════════════
+--[[ 
+    HORIONX HUB V7 - SUPREME EDITION ⚡
+    MONITORAMENTO: FPS + PING (ABA VISUAL)
+    MELHORIA: ESP BONE + CHECK DE PAREDE + FILTRO DE ARENA
+    STATUS: TUDO SOB CONTROLE, MIGUEL! 😈
 ]]
 
--- Verificar duplicação
-if _G.SonicEXESpeed then
-    warn("⚠️ Speed Sonic EXE já está rodando!")
-    return
-end
-_G.SonicEXESpeed = true
-
--- ═══════════════════════════════════════════════════════
--- SERVICES
--- ═══════════════════════════════════════════════════════
+task.wait(0.5)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-
+local Lighting = game:GetService("Lighting")
+local Stats = game:GetService("Stats")
+local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
 
--- ═══════════════════════════════════════════════════════
--- CONFIGURAÇÕES
--- ═══════════════════════════════════════════════════════
+local originalMaterials = {}
+local originalShadows = Lighting.GlobalShadows
 
-local Config = {
-    DefaultSpeed = 16,
-    CurrentSpeed = 16,
-    MaxSpeed = 500,
-    NoclipEnabled = false,
-    SpeedEnabled = false,
+if _G.PainelAtivo then pcall(function() _G.PainelAtivo:Destroy() end) end
+
+_G.Configs = _G.Configs or {
+    Aimbot = false, AimLock = false, AimForca = 0.15, DistanciaMax = 350,
+    ESP = false, SpinBot = false, SpinVelocidade = 50,
+    AntiLag = false, Shaders = false, AntiShakeVisual = false
 }
 
-local Connections = {}
+local CC = Lighting:FindFirstChild("HX_CC") or Instance.new("ColorCorrectionEffect", Lighting)
+CC.Name = "HX_CC"
 
--- ═══════════════════════════════════════════════════════
--- CRIAR GUI
--- ═══════════════════════════════════════════════════════
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SonicEXEGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-pcall(function()
-    ScreenGui.Parent = game:GetService("CoreGui")
-end)
-
-if not ScreenGui.Parent then
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- ==========================================
+-- FUNÇÕES DE SUPORTE
+-- ==========================================
+local function IsVisible(targetPart)
+    local ignoreList = {LocalPlayer.Character, targetPart.Parent}
+    local parts = Camera:GetPartsObscuringTarget({targetPart.Position}, ignoreList)
+    return #parts == 0
 end
 
--- ═══════════════════════════════════════════════════════
--- FRAME PRINCIPAL - HORIZONTAL
--- ═══════════════════════════════════════════════════════
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.Size = UDim2.new(0, 500, 0, 180)
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.ClipsDescendants = true
-
--- Começar invisível para animação
-MainFrame.BackgroundTransparency = 1
-MainFrame.Size = UDim2.new(0, 0, 0, 0)
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 20)
-MainCorner.Parent = MainFrame
-
--- Borda com gradiente roxo
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(150, 0, 255)
-MainStroke.Thickness = 4
-MainStroke.Transparency = 1
-MainStroke.Parent = MainFrame
-
--- Gradiente roxo
-local Gradient = Instance.new("UIGradient")
-Gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 0, 100)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 0, 60)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 0, 40))
-}
-Gradient.Rotation = 45
-Gradient.Parent = MainFrame
-
--- ═══════════════════════════════════════════════════════
--- EFEITO DE RAIOS (BACKGROUND)
--- ═══════════════════════════════════════════════════════
-
-local function CreateLightning()
-    for i = 1, 5 do
-        local Lightning = Instance.new("Frame")
-        Lightning.Name = "Lightning" .. i
-        Lightning.Parent = MainFrame
-        Lightning.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        Lightning.BorderSizePixel = 0
-        Lightning.Position = UDim2.new(math.random(0, 100) / 100, 0, 0, 0)
-        Lightning.Size = UDim2.new(0, 2, 1, 0)
-        Lightning.ZIndex = 0
-        Lightning.Rotation = math.random(-5, 5)
-        
-        -- Animar raios
-        spawn(function()
-            while Lightning.Parent do
-                local tween = TweenService:Create(Lightning, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
-                    BackgroundTransparency = math.random(50, 90) / 100
-                })
-                tween:Play()
-                wait(0.1)
+local function AplicarAntiLag(estado)
+    if estado then
+        Lighting.GlobalShadows = false
+        Lighting.Brightness = 0
+        Lighting.FogEnd = 9e9
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and not v:IsDescendantOf(LocalPlayer.Character) then
+                if not originalMaterials[v] then originalMaterials[v] = v.Material end
+                v.Material = Enum.Material.SmoothPlastic; v.CastShadow = false
             end
-        end)
+        end
+    else
+        Lighting.GlobalShadows = originalShadows
+        Lighting.Brightness = 2
+        for part, mat in pairs(originalMaterials) do if part.Parent then part.Material = mat; part.CastShadow = true end end
     end
 end
 
-CreateLightning()
+-- ==========================================
+-- 1. INTERFACE HORIONX (ESTRUTURA ORIGINAL)
+-- ==========================================
+local Screen = Instance.new("ScreenGui", game:GetService("CoreGui")); Screen.Name = "Horionx_Supreme"; _G.PainelAtivo = Screen
 
--- ═══════════════════════════════════════════════════════
--- TÍTULO COM RAIOS
--- ═══════════════════════════════════════════════════════
+local OpenBtn = Instance.new("TextButton", Screen)
+OpenBtn.Size = UDim2.new(0, 45, 0, 45); OpenBtn.Position = UDim2.new(0, 15, 0, 15); OpenBtn.BackgroundColor3 = Color3.fromRGB(20, 5, 30); OpenBtn.Text = "VIP"; OpenBtn.TextColor3 = Color3.fromRGB(180, 50, 255); OpenBtn.Font = "GothamBold"; Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0); Instance.new("UIStroke", OpenBtn).Color = Color3.fromRGB(138, 43, 226)
 
-local TitleFrame = Instance.new("Frame")
-TitleFrame.Name = "TitleFrame"
-TitleFrame.Parent = MainFrame
-TitleFrame.BackgroundTransparency = 1
-TitleFrame.Position = UDim2.new(0, 15, 0, 10)
-TitleFrame.Size = UDim2.new(1, -30, 0, 40)
+local Main = Instance.new("Frame", Screen)
+Main.Size = UDim2.new(0, 360, 0, 340); Main.Position = UDim2.new(0.5, -180, 0.5, -170); Main.BackgroundColor3 = Color3.fromRGB(10, 5, 15); Main.Visible = false; Main.Active = true; Main.Draggable = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12); Instance.new("UIStroke", Main).Color = Color3.fromRGB(138, 43, 226); Instance.new("UIStroke", Main).Thickness = 2
 
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Parent = TitleFrame
-Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, 0, 1, 0)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "⚡ SPEED SONIC EXE 💥"
-Title.TextColor3 = Color3.fromRGB(255, 50, 255)
-Title.TextSize = 24
-Title.TextStrokeTransparency = 0.5
-Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+local TopBar = Instance.new("Frame", Main); TopBar.Size = UDim2.new(1, 0, 0, 40); TopBar.BackgroundColor3 = Color3.fromRGB(20, 10, 35); Instance.new("UICorner", TopBar)
+local Title = Instance.new("TextLabel", TopBar); Title.Size = UDim2.new(1, -50, 1, 0); Title.Position = UDim2.new(0, 15, 0, 0); Title.BackgroundTransparency = 1; Title.Text = "HORIONX <font color='#8A2BE2'>HUB</font> V7 ⚡"; Title.RichText = true; Title.TextColor3 = Color3.new(1,1,1); Title.Font = "GothamBold"; Title.TextSize = 16; Title.TextXAlignment = "Left"
 
--- Efeito de brilho no título
-local TitleGlow = Instance.new("TextLabel")
-TitleGlow.Name = "TitleGlow"
-TitleGlow.Parent = TitleFrame
-TitleGlow.BackgroundTransparency = 1
-TitleGlow.Position = UDim2.new(0, 2, 0, 2)
-TitleGlow.Size = UDim2.new(1, 0, 1, 0)
-TitleGlow.Font = Enum.Font.GothamBold
-TitleGlow.Text = "⚡ SPEED SONIC EXE 💥"
-TitleGlow.TextColor3 = Color3.fromRGB(150, 0, 255)
-TitleGlow.TextSize = 24
-TitleGlow.TextTransparency = 0.5
-TitleGlow.ZIndex = 0
+local CloseBtn = Instance.new("TextButton", TopBar); CloseBtn.Size = UDim2.new(0, 28, 0, 28); CloseBtn.Position = UDim2.new(1, -35, 0, 6); CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40); CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", CloseBtn)
 
--- Animar brilho
-spawn(function()
-    while TitleGlow.Parent do
-        TweenService:Create(TitleGlow, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-            TextTransparency = 0.8
-        }):Play()
-        wait(0.5)
-        TweenService:Create(TitleGlow, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-            TextTransparency = 0.3
-        }):Play()
-        wait(0.5)
-    end
-end)
+local TabContainer = Instance.new("Frame", Main); TabContainer.Size = UDim2.new(1, 0, 0, 35); TabContainer.Position = UDim2.new(0, 0, 0, 40); TabContainer.BackgroundColor3 = Color3.fromRGB(15, 10, 25); Instance.new("UIListLayout", TabContainer).FillDirection = "Horizontal"
+local Content = Instance.new("Frame", Main); Content.Size = UDim2.new(1, -20, 1, -120); Content.Position = UDim2.new(0, 10, 0, 80); Content.BackgroundTransparency = 1
 
--- ═══════════════════════════════════════════════════════
--- CONTAINER DOS BOTÕES
--- ═══════════════════════════════════════════════════════
-
-local ButtonContainer = Instance.new("Frame")
-ButtonContainer.Name = "ButtonContainer"
-ButtonContainer.Parent = MainFrame
-ButtonContainer.BackgroundTransparency = 1
-ButtonContainer.Position = UDim2.new(0, 15, 0, 60)
-ButtonContainer.Size = UDim2.new(1, -30, 0, 110)
-
--- ═══════════════════════════════════════════════════════
--- FUNÇÃO PARA CRIAR BOTÃO COM ESTILO RAIO
--- ═══════════════════════════════════════════════════════
-
-local function CreateLightningButton(name, text, position, color)
-    local Button = Instance.new("TextButton")
-    Button.Name = name
-    Button.Parent = ButtonContainer
-    Button.BackgroundColor3 = color
-    Button.BorderSizePixel = 0
-    Button.Position = position
-    Button.Size = UDim2.new(0, 150, 0, 50)
-    Button.Font = Enum.Font.GothamBold
-    Button.Text = text
-    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Button.TextSize = 16
-    Button.TextStrokeTransparency = 0.5
-    Button.AutoButtonColor = false
-    
-    local BtnCorner = Instance.new("UICorner")
-    BtnCorner.CornerRadius = UDim.new(0, 12)
-    BtnCorner.Parent = Button
-    
-    -- Borda estilo raio
-    local BtnStroke = Instance.new("UIStroke")
-    BtnStroke.Color = Color3.fromRGB(150, 0, 255)
-    BtnStroke.Thickness = 3
-    BtnStroke.Parent = Button
-    
-    -- Gradiente
-    local BtnGradient = Instance.new("UIGradient")
-    BtnGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, color),
-        ColorSequenceKeypoint.new(1, Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7))
-    }
-    BtnGradient.Rotation = 45
-    BtnGradient.Parent = Button
-    
-    -- Efeito de raio interno
-    local LightningEffect = Instance.new("Frame")
-    LightningEffect.Name = "Lightning"
-    LightningEffect.Parent = Button
-    LightningEffect.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    LightningEffect.BackgroundTransparency = 0.9
-    LightningEffect.BorderSizePixel = 0
-    LightningEffect.Position = UDim2.new(0, 0, 0, 0)
-    LightningEffect.Size = UDim2.new(0, 0, 1, 0)
-    
-    local LightCorner = Instance.new("UICorner")
-    LightCorner.CornerRadius = UDim.new(0, 12)
-    LightCorner.Parent = LightningEffect
-    
-    -- Animação de clique
-    Button.MouseButton1Down:Connect(function()
-        TweenService:Create(Button, TweenInfo.new(0.1), {
-            Size = UDim2.new(0, 145, 0, 48)
-        }):Play()
-        
-        -- Efeito de raio ao clicar
-        TweenService:Create(LightningEffect, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1
-        }):Play()
+local function CreateTab(name)
+    local btn = Instance.new("TextButton", TabContainer); btn.Size = UDim2.new(0.333, 0, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(15, 10, 25); btn.Text = name; btn.TextColor3 = Color3.fromRGB(150, 150, 150); btn.Font = "GothamSemibold"; btn.BorderSizePixel = 0
+    local page = Instance.new("ScrollingFrame", Content); page.Size = UDim2.new(1, 0, 1, 0); page.BackgroundTransparency = 1; page.Visible = false; page.ScrollBarThickness = 0; Instance.new("UIListLayout", page).Padding = UDim.new(0, 8)
+    btn.MouseButton1Click:Connect(function()
+        for _, v in pairs(Content:GetChildren()) do if v:IsA("ScrollingFrame") then v.Visible = false end end
+        for _, v in pairs(TabContainer:GetChildren()) do if v:IsA("TextButton") then v.TextColor3 = Color3.fromRGB(150, 150, 150); v.BackgroundColor3 = Color3.fromRGB(15, 10, 25) end end
+        page.Visible = true; btn.TextColor3 = Color3.new(1,1,1); btn.BackgroundColor3 = Color3.fromRGB(40, 15, 65)
     end)
-    
-    Button.MouseButton1Up:Connect(function()
-        TweenService:Create(Button, TweenInfo.new(0.1), {
-            Size = UDim2.new(0, 150, 0, 50)
-        }):Play()
-        
-        LightningEffect.Size = UDim2.new(0, 0, 1, 0)
-        LightningEffect.BackgroundTransparency = 0.9
-    end)
-    
-    return Button
+    return page
 end
 
--- ═══════════════════════════════════════════════════════
--- CRIAR BOTÕES
--- ═══════════════════════════════════════════════════════
+local function CreateToggle(parent, text, key)
+    local f = Instance.new("TextButton", parent); f.Size = UDim2.new(1, -10, 0, 35); f.BackgroundColor3 = Color3.fromRGB(25, 15, 40); f.Text = "   " .. text; f.TextColor3 = Color3.new(0.9,0.9,0.9); f.Font = "Gotham"; f.TextXAlignment = "Left"; Instance.new("UICorner", f)
+    local ind = Instance.new("Frame", f); ind.Size = UDim2.new(0, 12, 0, 12); ind.Position = UDim2.new(1, -25, 0.5, -6); ind.BackgroundColor3 = _G.Configs[key] and Color3.fromRGB(138, 43, 226) or Color3.fromRGB(50, 20, 60); Instance.new("UICorner", ind)
+    f.MouseButton1Click:Connect(function() 
+        _G.Configs[key] = not _G.Configs[key] 
+        ind.BackgroundColor3 = _G.Configs[key] and Color3.fromRGB(138, 43, 226) or Color3.fromRGB(50, 20, 60)
+        if key == "AntiLag" then AplicarAntiLag(_G.Configs[key]) end
+        if key == "Shaders" then CC.Enabled = _G.Configs.Shaders; if _G.Configs.Shaders then CC.Saturation = 0.6; CC.Contrast = 0.4 end end
+    end)
+end
 
--- Botão Speed
-local SpeedButton = CreateLightningButton(
-    "SpeedButton",
-    "⚡ SPEED: OFF",
-    UDim2.new(0, 0, 0, 0),
-    Color3.fromRGB(60, 0, 100)
-)
+local function CreateSlider(parent, text, min, max, key)
+    local f = Instance.new("Frame", parent); f.Size = UDim2.new(1, -10, 0, 45); f.BackgroundColor3 = Color3.fromRGB(25, 15, 40); Instance.new("UICorner", f)
+    local l = Instance.new("TextLabel", f); l.Size = UDim2.new(1, -10, 0, 20); l.Position = UDim2.new(0, 10, 0, 2); l.BackgroundTransparency = 1; l.Text = text .. ": " .. (key == "AimForca" and string.format("%.2f", _G.Configs[key]) or _G.Configs[key]); l.TextColor3 = Color3.new(0.8,0.8,0.8); l.Font = "Gotham"; l.TextSize = 12; l.TextXAlignment = "Left"
+    local bg = Instance.new("Frame", f); bg.Size = UDim2.new(1, -20, 0, 6); bg.Position = UDim2.new(0, 10, 0, 30); bg.BackgroundColor3 = Color3.fromRGB(40, 40, 40); Instance.new("UICorner", bg)
+    local fill = Instance.new("Frame", bg); fill.Size = UDim2.new(math.clamp((_G.Configs[key]-min)/(max-min), 0, 1), 0, 1, 0); fill.BackgroundColor3 = Color3.fromRGB(138, 43, 226); Instance.new("UICorner", fill)
+    local btn = Instance.new("TextButton", bg); btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Text = ""
+    local sliding = false
+    btn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then sliding = true end end)
+    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then sliding = false end end)
+    RunService.RenderStepped:Connect(function()
+        if sliding and Main.Visible then
+            local p = math.clamp((UserInputService:GetMouseLocation().X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+            local v = min + (max - min) * p; if key ~= "AimForca" then v = math.floor(v) end
+            _G.Configs[key] = v; l.Text = text .. ": " .. (key == "AimForca" and string.format("%.2f", v) or v); fill.Size = UDim2.new(p, 0, 1, 0)
+        end
+    end)
+end
 
--- Botão Noclip
-local NoclipButton = CreateLightningButton(
-    "NoclipButton",
-    "👻 NOCLIP: OFF",
-    UDim2.new(0, 165, 0, 0),
-    Color3.fromRGB(80, 0, 120)
-)
+local TabA = CreateTab("Combate"); local TabV = CreateTab("Visual"); local TabE = CreateTab("Extras")
+CreateToggle(TabA, "Aimbot Visível", "Aimbot"); CreateToggle(TabA, "AimLock (Varar)", "AimLock")
+CreateSlider(TabA, "Força Suave", 0.01, 1, "AimForca")
+CreateSlider(TabA, "Raio Arena", 50, 600, "DistanciaMax")
+CreateToggle(TabV, "ESP SKELETON VIP", "ESP"); CreateToggle(TabV, "ANTI-LAG NITRO", "AntiLag"); CreateToggle(TabV, "SHADER RTX", "Shaders")
+CreateToggle(TabE, "Anti-Shake", "AntiShakeVisual"); CreateToggle(TabE, "SpinBot", "SpinBot")
+CreateSlider(TabE, "Velocidade Spin", 10, 300, "SpinVelocidade")
 
--- Botão Reset
-local ResetButton = CreateLightningButton(
-    "ResetButton",
-    "🔄 RESET",
-    UDim2.new(0, 330, 0, 0),
-    Color3.fromRGB(100, 0, 80)
-)
+local StatFrame = Instance.new("Frame", TabV); StatFrame.Size = UDim2.new(1, -10, 0, 30); StatFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 20); Instance.new("UICorner", StatFrame)
+local FpsLabel = Instance.new("TextLabel", StatFrame); FpsLabel.Size = UDim2.new(0.5, -10, 1, 0); FpsLabel.Position = UDim2.new(0, 10, 0, 0); FpsLabel.BackgroundTransparency = 1; FpsLabel.Text = "fps: 0"; FpsLabel.TextColor3 = Color3.new(1,1,1); FpsLabel.Font = "Gotham"; FpsLabel.TextSize = 10; FpsLabel.TextXAlignment = "Left"
+local PingLabel = Instance.new("TextLabel", StatFrame); PingLabel.Size = UDim2.new(0.5, -10, 1, 0); PingLabel.Position = UDim2.new(0.5, 0, 0, 0); PingLabel.BackgroundTransparency = 1; PingLabel.Text = "ping: 0ms"; PingLabel.TextColor3 = Color3.new(1,1,1); PingLabel.Font = "Gotham"; PingLabel.TextSize = 10; PingLabel.TextXAlignment = "Right"
 
--- ═══════════════════════════════════════════════════════
--- CONTROLE DE VELOCIDADE
--- ═══════════════════════════════════════════════════════
+OpenBtn.MouseButton1Click:Connect(function() Main.Visible = true; OpenBtn.Visible = false end); CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; OpenBtn.Visible = true end)
+TabA.Visible = true
 
-local SpeedContainer = Instance.new("Frame")
-SpeedContainer.Name = "SpeedContainer"
-SpeedContainer.Parent = ButtonContainer
-SpeedContainer.BackgroundTransparency = 1
-SpeedContainer.Position = UDim2.new(0, 0, 0, 60)
-SpeedContainer.Size = UDim2.new(1, 0, 0, 45)
-
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Name = "SpeedLabel"
-SpeedLabel.Parent = SpeedContainer
-SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.Position = UDim2.new(0, 0, 0, 0)
-SpeedLabel.Size = UDim2.new(0, 150, 0, 20)
-SpeedLabel.Font = Enum.Font.GothamBold
-SpeedLabel.Text = "💨 VELOCIDADE: 16"
-SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-SpeedLabel.TextSize = 14
-SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
--- Slider
-local SliderBG = Instance.new("Frame")
-SliderBG.Name = "SliderBG"
-SliderBG.Parent = SpeedContainer
-SliderBG.BackgroundColor3 = Color3.fromRGB(20, 0, 40)
-SliderBG.BorderSizePixel = 0
-SliderBG.Position = UDim2.new(0, 0, 0, 25)
-SliderBG.Size = UDim2.new(0, 320, 0, 15)
-
-local SliderCorner = Instance.new("UICorner")
-SliderCorner.CornerRadius = UDim.new(1, 0)
-SliderCorner.Parent = SliderBG
-
-local SliderStroke = Instance.new("UIStroke")
-SliderStroke.Color = Color3.fromRGB(150, 0, 255)
-SliderStroke.Thickness = 2
-SliderStroke.Parent = SliderBG
-
-local SliderFill = Instance.new("Frame")
-SliderFill.Name = "SliderFill"
-SliderFill.Parent = SliderBG
-SliderFill.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
-SliderFill.BorderSizePixel = 0
-SliderFill.Size = UDim2.new(0, 0, 1, 0)
-
-local FillCorner = Instance.new("UICorner")
-FillCorner.CornerRadius = UDim.new(1, 0)
-FillCorner.Parent = SliderFill
-
--- Gradiente no slider
-local SliderGradient = Instance.new("UIGradient")
-SliderGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 0, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 255))
-}
-SliderGradient.Parent = SliderFill
-
--- Botões +/-
-local MinusBtn = Instance.new("TextButton")
-MinusBtn.Name = "MinusBtn"
-MinusBtn.Parent = SpeedContainer
-MinusBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
-MinusBtn.BorderSizePixel = 0
-MinusBtn.Position = UDim2.new(0, 330, 0, 25)
-MinusBtn.Size = UDim2.new(0, 70, 0, 15)
-MinusBtn.Font = Enum.Font.GothamBold
-MinusBtn.Text = "➖"
-MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinusBtn.TextSize = 12
-
-local MinusCorner = Instance.new("UICorner")
-MinusCorner.CornerRadius = UDim.new(1, 0)
-MinusCorner.Parent = MinusBtn
-
-local PlusBtn = Instance.new("TextButton")
-PlusBtn.Name = "PlusBtn"
-PlusBtn.Parent = SpeedContainer
-PlusBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
-PlusBtn.BorderSizePixel = 0
-PlusBtn.Position = UDim2.new(0, 410, 0, 25)
-PlusBtn.Size = UDim2.new(0, 70, 0, 15)
-PlusBtn.Font = Enum.Font.GothamBold
-PlusBtn.Text = "➕"
-PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlusBtn.TextSize = 12
-
-local PlusCorner = Instance.new("UICorner")
-PlusCorner.CornerRadius = UDim.new(1, 0)
-PlusCorner.Parent = PlusBtn
-
--- ═══════════════════════════════════════════════════════
--- ANIMAÇÃO DE ENTRADA
--- ═══════════════════════════════════════════════════════
-
-local function PlayIntroAnimation()
-    -- Raios aparecem primeiro
-    for i = 1, 3 do
-        local Lightning = Instance.new("ImageLabel")
-        Lightning.Name = "IntroLightning"
-        Lightning.Parent = ScreenGui
-        Lightning.BackgroundTransparency = 1
-        Lightning.Position = UDim2.new(0.5, math.random(-200, 200), 0.5, math.random(-100, 100))
-        Lightning.Size = UDim2.new(0, 100, 0, 100)
-        Lightning.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-        Lightning.ImageColor3 = Color3.fromRGB(150, 0, 255)
-        Lightning.ImageTransparency = 1
-        Lightning.ZIndex = 10
-        
-        TweenService:Create(Lightning, TweenInfo.new(0.3), {
-            ImageTransparency = 0,
-            Rotation = 360
-        }):Play()
-        
-        wait(0.1)
-        
-        TweenService:Create(Lightning, TweenInfo.new(0.3), {
-            ImageTransparency = 1
-        }):Play()
-        
-        game:GetService("Debris"):AddItem(Lightning, 0.6)
+-- ==========================================
+-- 2. MOTORES (MELHORADOS)
+-- ==========================================
+local lastTime = tick(); local frameCount = 0
+RunService.Heartbeat:Connect(function()
+    frameCount = frameCount + 1
+    if tick() - lastTime >= 1 then
+        FpsLabel.Text = "fps: " .. frameCount
+        PingLabel.Text = "ping: " .. math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) .. "ms"
+        frameCount = 0; lastTime = tick()
     end
-    
-    wait(0.2)
-    
-    -- Janela aparece
-    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 500, 0, 180),
-        BackgroundTransparency = 0
-    }):Play()
-    
-    TweenService:Create(MainStroke, TweenInfo.new(0.5), {
-        Transparency = 0
-    }):Play()
-    
-    wait(0.3)
-    
-    -- Botões aparecem
-    for _, button in pairs(ButtonContainer:GetChildren()) do
-        if button:IsA("TextButton") or button:IsA("Frame") then
-            button.Position = button.Position + UDim2.new(0, -50, 0, 0)
-            TweenService:Create(button, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Position = button.Position + UDim2.new(0, 50, 0, 0)
-            }):Play()
-            wait(0.1)
+
+    if _G.Configs.SpinBot and LocalPlayer.Character then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(_G.Configs.SpinVelocidade), 0)
+    end
+
+    -- ESP BONE E VIDA
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local char = p.Character
+            local esp = char:FindFirstChild("HX_ESP") or Instance.new("Highlight", char); esp.Name = "HX_ESP"
+            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+            
+            if _G.Configs.ESP and char.Humanoid.Health > 0 and dist <= _G.Configs.DistanciaMax then
+                esp.Enabled = true; esp.FillTransparency = 0.5; esp.OutlineColor = Color3.fromRGB(138, 43, 226)
+                
+                -- Barra de Vida Lateral
+                local hum = char:FindFirstChild("Humanoid")
+                local bg = char.HumanoidRootPart:FindFirstChild("LifeGui") or Instance.new("BillboardGui", char.HumanoidRootPart)
+                bg.Name = "LifeGui"; bg.AlwaysOnTop = true; bg.Size = UDim2.new(4,0,5,0); bg.ExtentsOffset = Vector3.new(2.5, 0, 0)
+                local bar = bg:FindFirstChild("Bar") or Instance.new("Frame", bg); bar.Name = "Bar"; bar.Size = UDim2.new(0.15, 0, hum.Health/hum.MaxHealth, 0); bar.Position = UDim2.new(0,0,1-hum.Health/hum.MaxHealth,0); bar.BackgroundColor3 = Color3.new(0,1,0); bar.BorderSizePixel = 0
+            else 
+                esp.Enabled = false
+                if char.HumanoidRootPart:FindFirstChild("LifeGui") then char.HumanoidRootPart.LifeGui:Destroy() end
+            end
         end
     end
-end
+end)
 
--- ═══════════════════════════════════════════════════════
--- FUNÇÕES
--- ═══════════════════════════════════════════════════════
-
-local function UpdateSpeedDisplay(speed)
-    Config.CurrentSpeed = speed
-    SpeedLabel.Text = "💨 VELOCIDADE: " .. math.floor(speed)
-    
-    local percent = math.min(speed / Config.MaxSpeed, 1)
-    TweenService:Create(SliderFill, TweenInfo.new(0.3), {
-        Size = UDim2.new(percent, 0, 1, 0)
-    }):Play()
-end
-
-local function SetSpeed(enabled)
-    Config.SpeedEnabled = enabled
-    
-    if enabled then
-        Humanoid.WalkSpeed = Config.CurrentSpeed
-        SpeedButton.Text = "⚡ SPEED: ON"
-        SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    else
-        Humanoid.WalkSpeed = Config.DefaultSpeed
-        SpeedButton.Text = "⚡ SPEED: OFF"
-        SpeedButton.BackgroundColor3 = Color3.fromRGB(60, 0, 100)
-    end
-end
-
-local function SetNoclip(enabled)
-    Config.NoclipEnabled = enabled
-    
-    if enabled then
-        Connections.Noclip = RunService.Stepped:Connect(function()
-            for _, part in pairs(Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
+RunService.RenderStepped:Connect(function()
+    local target = nil; local menorDist = _G.Configs.DistanciaMax
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character.Humanoid.Health > 0 then
+            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            if dist < menorDist then
+                local head = p.Character.Head
+                if _G.Configs.AimLock then
+                    target = head; menorDist = dist
+                elseif _G.Configs.Aimbot and IsVisible(head) then
+                    target = head; menorDist = dist
                 end
             end
-        end)
-        
-        NoclipButton.Text = "👻 NOCLIP: ON"
-        NoclipButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    else
-        if Connections.Noclip then
-            Connections.Noclip:Disconnect()
         end
-        
-        for _, part in pairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-        
-        NoclipButton.Text = "👻 NOCLIP: OFF"
-        NoclipButton.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
     end
-end
-
-local function ResetAll()
-    SetSpeed(false)
-    SetNoclip(false)
-    UpdateSpeedDisplay(Config.DefaultSpeed)
-end
-
--- ═══════════════════════════════════════════════════════
--- EVENTOS
--- ═══════════════════════════════════════════════════════
-
-SpeedButton.MouseButton1Click:Connect(function()
-    SetSpeed(not Config.SpeedEnabled)
-end)
-
-NoclipButton.MouseButton1Click:Connect(function()
-    SetNoclip(not Config.NoclipEnabled)
-end)
-
-ResetButton.MouseButton1Click:Connect(function()
-    ResetAll()
-end)
-
-MinusBtn.MouseButton1Click:Connect(function()
-    local newSpeed = math.max(Config.CurrentSpeed - 10, Config.DefaultSpeed)
-    UpdateSpeedDisplay(newSpeed)
-    if Config.SpeedEnabled then
-        Humanoid.WalkSpeed = newSpeed
+    if target then
+        if _G.Configs.AimLock then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+        elseif _G.Configs.Aimbot then Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Position), _G.Configs.AimForca) end
     end
 end)
-
-PlusBtn.MouseButton1Click:Connect(function()
-    local newSpeed = math.min(Config.CurrentSpeed + 10, Config.MaxSpeed)
-    UpdateSpeedDisplay(newSpeed)
-    if Config.SpeedEnabled then
-        Humanoid.WalkSpeed = newSpeed
-    end
-end)
-
--- Atualizar speed quando mudar
-Connections.SpeedUpdate = RunService.Heartbeat:Connect(function()
-    if Config.SpeedEnabled then
-        Humanoid.WalkSpeed = Config.CurrentSpeed
-    end
-end)
-
--- Reset ao morrer
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    Humanoid = char:WaitForChild("Humanoid")
-    ResetAll()
-end)
-
--- ═══════════════════════════════════════════════════════
--- INICIALIZAÇÃO
--- ═══════════════════════════════════════════════════════
-
-UpdateSpeedDisplay(Config.DefaultSpeed)
-PlayIntroAnimation()
-
-print("╔════════════════════════════════════════╗")
-print("║  ⚡ SPEED SONIC EXE 💥 - ATIVADO ⚡   ║")
-print("╠════════════════════════════════════════╣")
-print("║                                        ║")
-print("║  ⚡ Speed: Velocidade personalizável  ║")
-print("║  👻 Noclip: Atravessar paredes        ║")
-print("║  🎨 Tema: Roxo com raios pretos       ║")
-print("║  📱 Interface: Mobile horizontal       ║")
-print("║  ✨ Animação: Entrada épica           ║")
-print("║                                        ║")
-print("╚════════════════════════════════════════╝")
-
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "⚡ SPEED SONIC EXE 💥";
-    Text = "Carregado com sucesso!";
-    Duration = 5;
-})
